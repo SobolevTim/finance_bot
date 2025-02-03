@@ -41,11 +41,11 @@ RUN apk add --no-cache tzdata
 WORKDIR /root/
 
 # Копируем скомпилированное приложение из стадии сборки
-COPY --from=builder /app/myapp .
+COPY --from=builder /app/finance-bot .
 
 # Копируем файл .env (если используется)
 COPY .env .
 COPY internal/database/migration.sql ./internal/database/migration.sql
 
 # Команда для запуска приложения
-CMD ["./myapp"]
+CMD ["./finance-bot"]
