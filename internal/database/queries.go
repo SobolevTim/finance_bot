@@ -10,24 +10,25 @@ import (
 
 // Users структура для хранения данных о пользователях
 type Users struct {
-	ID            int
-	TelegramID    int64
-	Username      string
-	Email         string
-	PasswordHash  string
-	MonthlyBudget int
-	CreatedAt     time.Time
-	Notify        bool
+	ID            int       // ID пользователя
+	TelegramID    int64     // ID пользователя в Telegram
+	Username      string    // Имя пользователя
+	Email         string    // Почта пользователя
+	PasswordHash  string    // Хеш пароля пользователя
+	MonthlyBudget int       // Месячный бюджет пользователя
+	CreatedAt     time.Time // Дата создания записи
+	Notify        bool      // Подписка на уведомления
 }
 
 // Expenses структура для хранения данных о расходах
 type Expenses struct {
-	ID          int
-	UserID      int
-	CategoryID  int
-	Amount      int
-	ExpenseDate time.Time
-	CreatedAt   time.Time
+	ID          int       // ID расхода
+	UserID      int       // Пользователь, который внес расход
+	CategoryID  int       // Категория расхода
+	Note        string    // Описание расхода
+	Amount      int       // Сумма расхода
+	ExpenseDate time.Time // Дата расхода
+	CreatedAt   time.Time // Дата создания записи
 }
 
 // InsertStartUsers записывает изначальные данные при первом запуске бота
@@ -54,49 +55,64 @@ func (b *Service) InsertStartUsers(user Users) error {
 	return nil
 }
 
-// UpdateDayExpense обновляет данные о расходах за день
+// SetDayExpense записывает данные о расходах за день и возвращает общую сумму трат за день
+// и данные о расходах
 //
 // Параметры:
 // - user - данные о пользователе
 // - expense - данные о расходах
 //
 // Возвращает ошибку при возникновении проблем с обновлением данных в БД
-// или возвращает обновленные данные о расходах
-func (b *Service) UpdateDayExpense(user Users, expense Expenses) (Expenses, error) {
-	var result Expenses
+// или возвращает общую сумму трат за день и данные о расходах
+func (b *Service) SetDayExpense(user Users, expense Expenses) (int, []Expenses, error) {
 	ctx := context.Background()
+
+	// Запись новой траты
+	insertQuery := `
+		INSERT INTO expenses (user_id, note, amount, expense_date)
+		VALUES ((SELECT user_id FROM users WHERE telegram_id = $1), $2, $3, $4)
+		RETURNING expense_id, amount, expense_date;
+	`
+	_, err := b.DB.Exec(ctx, insertQuery, user.TelegramID, expense.Note, expense.Amount, expense.ExpenseDate)
+	if err != nil {
+		return 0, nil, fmt.Errorf("ошибка при записи новой траты: %w", err)
+	}
+
+	// запрос на получения данных о тратах за день
 	query := `
-        SELECT e.expense_id, e.amount, e.expense_date
-        FROM expenses e
-        JOIN users u ON e.user_id = u.user_id
-        LEFT JOIN categories c ON e.category_id = c.category_id
-        WHERE u.telegram_id = $1
-        AND e.expense_date = $2;
-    `
-	err := b.DB.QueryRow(ctx, query, user.TelegramID, expense.ExpenseDate).Scan(&result.ID, &result.Amount, &result.ExpenseDate)
+		SELECT e.expense_id, e.note, e.amount, e.expense_date
+		FROM expenses e
+		JOIN users u ON e.user_id = u.user_id
+		WHERE u.telegram_id = $1
+		AND e.expense_date = $2;
+	`
+
+	// Запрос данных о тратах за день
+	rows, err := b.DB.Query(ctx, query, user.TelegramID, expense.ExpenseDate)
 	if err != nil {
-		if err.Error() == "no rows in result set" {
-			insertQuery := `
-                INSERT INTO expenses (user_id, amount, expense_date)
-                VALUES ((SELECT user_id FROM users WHERE telegram_id = $1), $2, $3)
-                RETURNING expense_id, amount, expense_date;
-            `
-			err = b.DB.QueryRow(ctx, insertQuery, user.TelegramID, 0, expense.ExpenseDate).Scan(&result.ID, &result.Amount, &result.ExpenseDate)
-			if err != nil {
-				return Expenses{}, fmt.Errorf("ошибка при записи 0 значения: %w", err)
-			}
-		} else {
-			return Expenses{}, fmt.Errorf("ошибка при получении данных: %w", err)
+		return 0, nil, fmt.Errorf("ошибка при получении данных о тратах: %w", err)
+	}
+	defer rows.Close()
+
+	// Подсчет общей суммы трат за день
+	var totalAmount int
+	var expenses []Expenses
+	for rows.Next() {
+		var exp Expenses
+		if err := rows.Scan(&exp.ID, &exp.Note, &exp.Amount, &exp.ExpenseDate); err != nil {
+			return 0, nil, fmt.Errorf("ошибка при считывании данных о тратах: %w", err)
 		}
+		totalAmount += exp.Amount
+		expenses = append(expenses, exp)
 	}
-	result.Amount += expense.Amount
-	_, err = b.DB.Exec(ctx, "UPDATE expenses SET amount = $1 WHERE expense_id = $2",
-		result.Amount,
-		result.ID)
-	if err != nil {
-		return Expenses{}, fmt.Errorf("ошибка при обновлении expenses amount: %w", err)
+
+	// Завершение итерации по данным о тратах
+	if err = rows.Err(); err != nil {
+		return 0, nil, fmt.Errorf("ошибка при завершении итерации по данным о тратах: %w", err)
 	}
-	return result, nil
+
+	// Возврат общей суммы трат за день и данных о тратах
+	return totalAmount, expenses, nil
 }
 
 // UpdateMontlyBudget обновляет данные о месячном бюджете
@@ -250,25 +266,35 @@ func (b *Service) GetUsersWitchNotify() ([]Users, error) {
 //
 // Возвращает ошибку при возникновении проблем с получением данных из БД
 // или возвращает данные о расходах
-func (b *Service) GetExpenseFromDate(user Users, expese Expenses) (Expenses, error) {
+func (b *Service) GetExpenseFromDate(user Users, expenseDate time.Time) ([]Expenses, error) {
 	ctx := context.Background()
 
 	query := `
-		SELECT e.amount
+		SELECT e.expense_id, e.note, e.amount, e.expense_date
 		FROM expenses e
 		JOIN users u ON e.user_id = u.user_id
 		WHERE u.telegram_id = $1
 			AND e.expense_date = $2;
 	`
 
-	err := b.DB.QueryRow(ctx, query, user.TelegramID, expese.ExpenseDate).Scan(&expese.Amount)
+	rows, err := b.DB.Query(ctx, query, user.TelegramID, expenseDate)
 	if err != nil {
-		if err.Error() == "no rows in result set" {
-			expese.Amount = 0
-		} else {
-			return Expenses{}, fmt.Errorf("ошибка при обновлении GetExpenseFromDate: %w", err)
+		return nil, fmt.Errorf("ошибка при получении данных о тратах: %w", err)
+	}
+	defer rows.Close()
+
+	var expenses []Expenses
+	for rows.Next() {
+		var exp Expenses
+		if err := rows.Scan(&exp.ID, &exp.Note, &exp.Amount, &exp.ExpenseDate); err != nil {
+			return nil, fmt.Errorf("ошибка при считывании данных о тратах: %w", err)
 		}
+		expenses = append(expenses, exp)
 	}
 
-	return expese, nil
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("ошибка при завершении итерации по данным о тратах: %w", err)
+	}
+
+	return expenses, nil
 }

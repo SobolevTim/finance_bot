@@ -24,7 +24,9 @@ var (
 	// 1. Число с плавающей точкой
 	floatRegex = regexp.MustCompile(`^[-+]?[0-9]*[.,]?[0-9]+([ \t]*[+-/*][ \t]*[-+]?[0-9]*[.,]?[0-9]+)*$`)
 	// 2. Несколько чисел с плавающей точкой (разделенные + и -)
-	multipleFloatsRegex = regexp.MustCompile(`^([-+]?[0-9]*\.?[0-9]+\s*[-+]\s*)*[-+]?[0-9]*\.?[0-9]+$`)
+	multipleFloatsRegex = regexp.MustCompile(`^([-+]?[0-9]*\.?[0-9]+\s*[-+/*]\s*)*[-+]?[0-9]*\.?[0-9]+$`)
+	// 3. Числа с плавающей точкой, мат. операторами и текстом
+	floatsWithTextRegex = regexp.MustCompile(`^([-+]?[0-9]*[.,]?[0-9]+([ \t]*[+-/*][ \t]*[-+]?[0-9]*[.,]?[0-9]+)*)(\s+.*)?$`)
 )
 
 // Хранилище для состояния пользователей
@@ -72,6 +74,9 @@ func (b *Bot) handleMessage(msg *telego.Message, service *database.Service) {
 			b.handleToDayAmount(msg, service)
 		case multipleFloatsRegex.MatchString(msgText):
 			// Обработка нескольких чисел с плавающей точкой
+			b.handleToDayAmount(msg, service)
+		case floatsWithTextRegex.MatchString(msgText):
+			// Обработка чисел с плавающей точкой, мат. операторами и текстом
 			b.handleToDayAmount(msg, service)
 		default:
 			b.sendMessage(msg.Chat.ID, "неизвестный формат сообщения. Используйте /help для получения информации о доступных командах\nДля записы трат за сегодняший день - просто напишите сумму трат.\nДля запиши трат на конкретную дату - напишите: Дата ДАТА(в формате ДД.ММ.ГГ) СУММА ТРАТ, например: Дата 01.01.24 1000")
@@ -328,7 +333,8 @@ func (b *Bot) handleAmountInput(msg *telego.Message, service *database.Service) 
 	b.sendMessage(msg.Chat.ID, message)
 }
 
-// handleDataGetAmount обрабатывает команду "Сколько" от пользователя и отправляет информацию о сумме трат за указанную дату.
+// handleToDayAmount обрабатывает ввод пользователя для записи трат на текущую дату.
+// В зависимости от ввода пользователя сумма трат добавляется или вычитается из общей суммы трат за текущий день
 //
 // Параметры:
 //   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
@@ -337,36 +343,63 @@ func (b *Bot) handleAmountInput(msg *telego.Message, service *database.Service) 
 // В случае успешного получения информации отправляется сообщение с суммой трат за указанную дату.
 // В случае ошибки при получении информации отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleToDayAmount(msg *telego.Message, service *database.Service) {
-	amount, err := calculator.Calc(msg.Text)
-	if err != nil {
-		message := "Введите корректную сумму (например: 123.45 или 123.45 + 67 - 89)."
-		b.sendMessage(msg.Chat.ID, message)
+	// Разделение текста на сумму и примечание
+	parts := floatsWithTextRegex.FindStringSubmatch(msg.Text)
+	if len(parts) < 2 {
+		b.sendMessage(msg.Chat.ID, "Введите корректную сумму (например: 123.45 или 123.45 + 67 - 89).")
 		return
 	}
+
+	// Разделение суммы на числа и операторы
+	amountStr := parts[1]
+	note := ""
+	if len(parts) > 3 {
+		note = strings.TrimSpace(parts[3])
+	}
+
+	// Вычисление суммы
+	amount, err := calculator.Calc(amountStr)
+	if err != nil {
+		b.sendMessage(msg.Chat.ID, "Введите корректную сумму (например: 123.45 или 123.45 + 67 - 89).")
+		return
+	}
+
+	// Запись суммы в базу данных
 	user := database.Users{
 		TelegramID: msg.Chat.ID,
 	}
+
+	// Создание экземпляра трат
 	expence := database.Expenses{
 		Amount:      amount,
 		ExpenseDate: time.Now(),
+		Note:        note,
 	}
-	todayExp, err := service.UpdateDayExpense(user, expence)
+
+	totalSum, todayExp, err := service.SetDayExpense(user, expence)
 	if err != nil {
 		b.sendMessage(msg.Chat.ID, "Произошла ошибка при записи суммы трат.")
 		log.Printf("ERROR: %v", err)
 		return
 	}
+
 	var message string
-	switch {
-	case todayExp.Amount != amount:
-		if amount > 0 {
-			message = fmt.Sprintf("Добавил %.2f к Вашим тратам на сегодня.\nИтоговая сумма трат за сегодня: %.2f", float64(amount)/100, float64(todayExp.Amount)/100)
-		} else {
-			message = fmt.Sprintf("Вычел %.2f из Ваших трат за сегодня.\nИтоговая сумма трат за сегодня: %.2f", float64(amount)/100, float64(todayExp.Amount)/100)
+
+	// формирование сообщения
+	if len(todayExp) > 1 {
+		message = fmt.Sprintf("Записал %.2f к Вашим тратам на сегодня.\nИтоговая сумма трат составляет: %.2f", float64(amount)/100, float64(totalSum)/100)
+		message += "\nЗаписи за сегодня:"
+		for i, exp := range todayExp {
+			message += fmt.Sprintf("\n%d: %.2f %s", i+1, float64(exp.Amount)/100, exp.Note)
 		}
-	case todayExp.Amount == amount:
-		message = fmt.Sprintf("Записал %.2f к Вашим тратам на сегодня.", float64(amount)/100)
+	} else {
+		if note != "" {
+			message = fmt.Sprintf("Записал %.2f с примечанием \"%s\" к Вашим тратам на сегодня.", float64(amount)/100, note)
+		} else {
+			message = fmt.Sprintf("Записал %.2f к Вашим тратам на сегодня.", float64(amount)/100)
+		}
 	}
+
 	b.sendMessage(msg.Chat.ID, message)
 }
 
@@ -381,7 +414,7 @@ func (b *Bot) handleToDayAmount(msg *telego.Message, service *database.Service) 
 func (b *Bot) handleDataInsertAmount(msg *telego.Message, service *database.Service) {
 	text := strings.Split(msg.Text, " ")
 	if len(text) < 3 {
-		b.sendMessage(msg.Chat.ID, "Кажется Вы забыли что-то ввести!🥲\nНапоминаю, что формат ввода даных должен быть такой:\nДата 01.02.2024 ТРАТЫ\nТраты можно вводить как одним числом, так и несколько чисел с мат. операторами (сложение +; вычитание -; умножение *; деление /)")
+		b.sendMessage(msg.Chat.ID, "Кажется Вы забыли что-то ввести!🥲\nНапоминаю, что формат ввода даных должен быть такой:\nДата 01.02.2024 ТРАТЫ Примечание (при необходимости)\nТраты можно вводить как одним числом, так и несколько чисел с мат. операторами (сложение +; вычитание -; умножение *; деление /)")
 		return
 	}
 	var date time.Time
@@ -405,12 +438,23 @@ func (b *Bot) handleDataInsertAmount(msg *telego.Message, service *database.Serv
 		return
 	}
 
-	nums := strings.Join(text[2:], " ")
-	amount, err := calculator.Calc(nums)
+	// Разделение текста на сумму и примечание
+	parts := floatsWithTextRegex.FindStringSubmatch(strings.Join(text[2:], " "))
+	if len(parts) < 2 {
+		b.sendMessage(msg.Chat.ID, "Введите корректную сумму (например: 123.45 или 123.45 + 67 - 89).")
+		return
+	}
+
+	amount, err := calculator.Calc(parts[1])
 	if err != nil {
 		message := "Введите корректную сумму (например: 123.45 или 123.45 + 67 - 89)."
 		b.sendMessage(msg.Chat.ID, message)
 		return
+	}
+
+	note := ""
+	if len(parts) > 3 {
+		note = strings.TrimSpace(parts[3])
 	}
 
 	user := database.Users{
@@ -419,25 +463,29 @@ func (b *Bot) handleDataInsertAmount(msg *telego.Message, service *database.Serv
 	expence := database.Expenses{
 		Amount:      amount,
 		ExpenseDate: date,
+		Note:        note,
 	}
 
-	todayExp, err := service.UpdateDayExpense(user, expence)
+	totalSum, dayExp, err := service.SetDayExpense(user, expence)
 	if err != nil {
 		b.sendMessage(msg.Chat.ID, "Произошла ошибка при записи суммы трат.")
 		log.Printf("ERROR: %v", err)
 		return
 	}
+
 	var message string
-	switch {
-	case todayExp.Amount != amount:
-		if amount > 0 {
-			message = fmt.Sprintf("Добавил %.2f к Вашим тратам на дату: %v.\nИтоговая сумма трат составляет: %.2f", float64(amount)/100, date.Format("02.01.2006"), float64(todayExp.Amount)/100)
-		} else {
-			message = fmt.Sprintf("Вычел %.2f из Ваших трат за дату: %v.\nИтоговая сумма трат составляет: %.2f", float64(amount)/100, date.Format("02.01.2006"), float64(todayExp.Amount)/100)
+
+	// формирование сообщения
+	if len(dayExp) > 1 {
+		message = fmt.Sprintf("Записал %.2f к Вашим тратам на сегодня.\nИтоговая сумма трат составляет: %.2f", float64(amount)/100, float64(totalSum)/100)
+		message += "\nЗаписи за сегодня:"
+		for _, exp := range dayExp {
+			message += fmt.Sprintf("\n%s: %.2f", exp.Note, float64(exp.Amount)/100)
 		}
-	case todayExp.Amount == amount:
-		message = fmt.Sprintf("Записал %.2f к Вашим тратам на дату: %v.", float64(amount)/100, todayExp.ExpenseDate.Format("02.01.2006"))
+	} else {
+		message = fmt.Sprintf("Записал %.2f с примечанием %s к Вашим тратам на сегодня.", float64(amount)/100, note)
 	}
+
 	b.sendMessage(msg.Chat.ID, message)
 }
 
@@ -480,24 +528,27 @@ func (b *Bot) handleDataGetAmount(msg *telego.Message, service *database.Service
 	user := database.Users{
 		TelegramID: msg.Chat.ID,
 	}
-	expense := database.Expenses{
-		ExpenseDate: date,
-	}
-	dateExpense, err := service.GetExpenseFromDate(user, expense)
+
+	dateExpenses, err := service.GetExpenseFromDate(user, date)
 	if err != nil {
 		b.sendMessage(msg.Chat.ID, "Произошла ошибка при получении суммы трат.")
 		log.Printf("ERROR: %v", err)
 		return
 	}
 	var message string
-	switch {
-	case dateExpense.Amount == 0:
-		message = fmt.Sprintf("За %s записей о тратах нет! Если вы что-то тратили в этот день - запишите траты\nДля это воспользуйтесь конструкцией: Дата 01.02.2024 ТРАТЫ\nНапример, 01.02.2024 1000 + 500", expense.ExpenseDate.Format("02.01.2006"))
-	case dateExpense.Amount < 0:
-		message = fmt.Sprintf("Ого! За %s не траты а заработок! Записана сумма: %.2f", expense.ExpenseDate.Format("02.01.2006"), float64(dateExpense.Amount)/100)
-	default:
-		message = fmt.Sprintf("Ваши траты на дату %s составляют: %.2f", expense.ExpenseDate.Format("02.01.2006"), float64(dateExpense.Amount)/100)
+
+	if len(dateExpenses) == 0 {
+		message = fmt.Sprintf("За %s записей о тратах нет! Если вы что-то тратили в этот день - запишите траты\nДля это воспользуйтесь конструкцией: Дата 01.02.2024 ТРАТЫ Примечание (при необходимости)\nНапример, 01.02.2024 1000 + 500", date.Format("02.01.2006"))
+		b.sendMessage(msg.Chat.ID, message)
+		return
 	}
+
+	// формирование сообщения, если есть записи о тратах
+	message = fmt.Sprintf("За %s имеются следующие записи о тратах:", date.Format("02.01.2006"))
+	for i, dateExpense := range dateExpenses {
+		message += fmt.Sprintf("\n%d: %.2f %s", i+1, float64(dateExpense.Amount)/100, dateExpense.Note)
+	}
+
 	b.sendMessage(msg.Chat.ID, message)
 }
 

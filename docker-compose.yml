@@ -19,7 +19,7 @@ services:
 
   # Сервис для вашего бота
   bot:
-    image: finance_bot
+    image: finance_bot:latest
     container_name: finance_bot
     depends_on:
       - db

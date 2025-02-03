@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     expense_id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(user_id) ON DELETE CASCADE,
     category_id INTEGER REFERENCES categories(category_id) ON DELETE SET NULL,
+    note TEXT,
     amount INTEGER NOT NULL,
     expense_date DATE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
