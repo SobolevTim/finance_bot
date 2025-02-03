@@ -13,11 +13,13 @@ import (
 	"github.com/mymmrac/telego"
 )
 
+// userMontlyBudget и userNotify - статусы для ожидания ввода суммы на месяц и уведомлений
 const (
 	userMontlyBudget = "awaiting_total_amount" // Статус для ожидания ввода суммы на месяц для пользователя
 	userNotify       = "awaiting_status"       // Статус ожидания ввода подписки на уведомления
 )
 
+// Регулярные выражения для проверки ввода пользователя
 var (
 	// 1. Число с плавающей точкой
 	floatRegex = regexp.MustCompile(`^[-+]?[0-9]*[.,]?[0-9]+([ \t]*[+-/*][ \t]*[-+]?[0-9]*[.,]?[0-9]+)*$`)
@@ -163,6 +165,13 @@ func (b *Bot) handleHelp(msg *telego.Message) {
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleCancel отменяет текущее состояние ввода данных пользователя и удаляет его из хранилища состояний.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//
+// После отмены состояния ввода пользователю отправляется сообщение с подтверждением отмены и
+// инструкциями по использованию команды /help для получения списка доступных команд.
 func (b *Bot) handleCancel(msg *telego.Message) {
 	delete(userState, msg.Chat.ID)
 	message := "Вы отменили ввод. Для просмотра списка команд используйте /help."
@@ -194,6 +203,17 @@ func (b *Bot) handleExpence(msg *telego.Message, service *database.Service) {
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleNotify обрабатывает команду /notify от пользователя и отправляет информацию о текущем статусе подписки
+// на ежедневные уведомления. В зависимости от статуса подписки отправляется соответствующее сообщение.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// Статусы подписки:
+//   - Если пользователь подписан на уведомления, отправляется сообщение о текущем статусе и инструкциями по изменению.
+//   - Если пользователь не подписан на уведомления, отправляется сообщение о текущем статусе и инструкциями по изменению.
+//   - После отправки сообщения пользователю устанавливается статус userNotify для ожидания ввода нового статуса.
 func (b *Bot) handleNotify(msg *telego.Message, service *database.Service) {
 	user, err := service.GetUserNotify(database.Users{TelegramID: msg.Chat.ID})
 	if err != nil {
@@ -212,6 +232,15 @@ func (b *Bot) handleNotify(msg *telego.Message, service *database.Service) {
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleNotifyInput обрабатывает ввод пользователя для изменения статуса подписки на ежедневные уведомления.
+// В зависимости от ввода пользователя статус подписки изменяется и отправляется соответствующее сообщение.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// В случае успешного изменения статуса подписки отправляется сообщение с подтверждением изменения.
+// В случае ошибки при изменении статуса подписки отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleNotifyInput(msg *telego.Message, service *database.Service) {
 	text := strings.ToLower(msg.Text)
 	if text != "подписка" {
@@ -236,12 +265,29 @@ func (b *Bot) handleNotifyInput(msg *telego.Message, service *database.Service) 
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleUpdateMonthlySum обрабатывает команду /update_montly_sum от пользователя и отправляет запрос на ввод
+// новой суммы месячного бюджета. После отправки запроса устанавливается статус userMontlyBudget для ожидания ввода.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//
+// После отправки запроса на ввод новой суммы месячного бюджета пользователю отправляется сообщение с инструкциями
+// по вводу новой суммы и использованию команды /cancel для отмены ввода.
+// После отправки запроса устанавливается статус userMontlyBudget для ожидания ввода новой суммы.
 func (b *Bot) handleUpdateMonthlySum(msg *telego.Message) {
 	message := "Введите новую сумму трат на месяц.\nЕсли вы передумали - используйте команду /cancel"
 	userState[msg.Chat.ID] = userMontlyBudget
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleMonthlyBudget обрабатывает команду /montly от пользователя и отправляет текущую сумму месячного бюджета.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// После получения текущей суммы месячного бюджета отправляется сообщение с информацией о сумме.
+// В случае ошибки при получении суммы месячного бюджета отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleMonthlyBudget(msg *telego.Message, service *database.Service) {
 	user, err := service.GetMontlyBudget(database.Users{TelegramID: msg.Chat.ID})
 	if err != nil {
@@ -253,6 +299,14 @@ func (b *Bot) handleMonthlyBudget(msg *telego.Message, service *database.Service
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleAmountInput обрабатывает ввод пользователя для обновления суммы месячного бюджета.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// В случае успешного обновления суммы месячного бюджета отправляется сообщение с подтверждением обновления.
+// В случае ошибки при обновлении суммы месячного бюджета отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleAmountInput(msg *telego.Message, service *database.Service) {
 	amount, err := strconv.ParseFloat(msg.Text, 64)
 	if err != nil {
@@ -274,6 +328,14 @@ func (b *Bot) handleAmountInput(msg *telego.Message, service *database.Service) 
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleDataGetAmount обрабатывает команду "Сколько" от пользователя и отправляет информацию о сумме трат за указанную дату.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// В случае успешного получения информации отправляется сообщение с суммой трат за указанную дату.
+// В случае ошибки при получении информации отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleToDayAmount(msg *telego.Message, service *database.Service) {
 	amount, err := calculator.Calc(msg.Text)
 	if err != nil {
@@ -308,6 +370,14 @@ func (b *Bot) handleToDayAmount(msg *telego.Message, service *database.Service) 
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleDataInsertAmount обрабатывает ввод пользователя для записи трат на указанную дату.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// В случае успешной записи трат на указанную дату отправляется сообщение с подтверждением записи.
+// В случае ошибки при записи трат отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleDataInsertAmount(msg *telego.Message, service *database.Service) {
 	text := strings.Split(msg.Text, " ")
 	if len(text) < 3 {
@@ -371,6 +441,14 @@ func (b *Bot) handleDataInsertAmount(msg *telego.Message, service *database.Serv
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleDataGetAmount обрабатывает команду "Сколько" от пользователя и отправляет информацию о сумме трат за указанную дату.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о пользователе, отправившем запрос.
+//   - service: экземпляр database.Service, обеспечивающий доступ к операциям с базой данных.
+//
+// В случае успешного получения информации отправляется сообщение с суммой трат за указанную дату.
+// В случае ошибки при получении информации отправляется сообщение об ошибке и записывается в лог.
 func (b *Bot) handleDataGetAmount(msg *telego.Message, service *database.Service) {
 	text := strings.Split(msg.Text, " ")
 	if len(text) < 2 {
@@ -423,6 +501,14 @@ func (b *Bot) handleDataGetAmount(msg *telego.Message, service *database.Service
 	b.sendMessage(msg.Chat.ID, message)
 }
 
+// handleNewChat обрабатывает событие добавления новых пользователей в чат и отправляет приветственное сообщение
+// с инструкциями по использованию бота.
+//
+// Параметры:
+//   - msg: объект telego.Message, содержащий информацию о новых пользователях, добавленных в чат.
+//
+// При обнаружении новых пользователей в чате отправляется приветственное сообщение с инструкциями по использованию бота.
+// Если в чат добавлен бот, отправляется сообщение с инструкциями для начала работы.
 func (b *Bot) handleNewChat(msg *telego.Message) {
 	if msg.NewChatMembers != nil {
 		for _, user := range msg.NewChatMembers {

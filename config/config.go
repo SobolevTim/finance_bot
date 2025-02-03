@@ -7,12 +7,14 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config структура для хранения конфигурации бота
 type Config struct {
 	BotToken    string
 	DatabaseURL string
 	AdminChat   string
 }
 
+// LoadConfig загружает конфигурацию из переменных окружения
 func LoadConfig() (*Config, error) {
 	err := godotenv.Load(".env")
 	if err != nil {

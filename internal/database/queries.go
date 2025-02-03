@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx"
 )
 
+// Users структура для хранения данных о пользователях
 type Users struct {
 	ID            int
 	TelegramID    int64
@@ -19,6 +20,7 @@ type Users struct {
 	Notify        bool
 }
 
+// Expenses структура для хранения данных о расходах
 type Expenses struct {
 	ID          int
 	UserID      int
@@ -28,6 +30,12 @@ type Expenses struct {
 	CreatedAt   time.Time
 }
 
+// InsertStartUsers записывает изначальные данные при первом запуске бота
+//
+// Параметры:
+// - user - данные о пользователе
+//
+// Возвращает ошибку при возникновении проблем с записью данных в БД
 func (b *Service) InsertStartUsers(user Users) error {
 	ctx := context.Background()
 
@@ -46,6 +54,14 @@ func (b *Service) InsertStartUsers(user Users) error {
 	return nil
 }
 
+// UpdateDayExpense обновляет данные о расходах за день
+//
+// Параметры:
+// - user - данные о пользователе
+// - expense - данные о расходах
+//
+// Возвращает ошибку при возникновении проблем с обновлением данных в БД
+// или возвращает обновленные данные о расходах
 func (b *Service) UpdateDayExpense(user Users, expense Expenses) (Expenses, error) {
 	var result Expenses
 	ctx := context.Background()
@@ -83,6 +99,12 @@ func (b *Service) UpdateDayExpense(user Users, expense Expenses) (Expenses, erro
 	return result, nil
 }
 
+// UpdateMontlyBudget обновляет данные о месячном бюджете
+//
+// Параметры:
+// - user - данные о пользователе
+//
+// Возвращает ошибку при возникновении проблем с обновлением данных в БД
 func (b *Service) UpdateMontlyBudget(user Users) error {
 	ctx := context.Background()
 	_, err := b.DB.Exec(ctx, "UPDATE users SET monthly_budget = $1 WHERE telegram_id = $2",
@@ -95,6 +117,13 @@ func (b *Service) UpdateMontlyBudget(user Users) error {
 	return nil
 }
 
+// GetMontlyBudget получает данные о месячном бюджете
+//
+// Параметры:
+// - user - данные о пользователе
+//
+// Возвращает ошибку при возникновении проблем с получением данных из БД
+// или возвращает данные о месячном бюджете
 func (b *Service) GetMontlyBudget(user Users) (Users, error) {
 	ctx := context.Background()
 
@@ -110,6 +139,12 @@ func (b *Service) GetMontlyBudget(user Users) (Users, error) {
 	return user, nil
 }
 
+// GetAverageMontlyExpenses получает средние месячные траты
+//
+// Параметры:
+// - user - данные о пользователе
+//
+// Возвращает ошибку при возникновении проблем с получением данных из БД
 func (b *Service) GetAverageMontlyExpenses(user Users) (Expenses, error) {
 	var result Expenses
 	ctx := context.Background()
@@ -128,6 +163,12 @@ func (b *Service) GetAverageMontlyExpenses(user Users) (Expenses, error) {
 	return result, nil
 }
 
+// GetUserNotify получает данные о настройках уведомлений пользователя
+//
+// Параметры:
+// - user - данные о пользователе
+//
+// Возвращает ошибку при возникновении проблем с получением данных из БД
 func (b *Service) GetUserNotify(user Users) (Users, error) {
 	ctx := context.Background()
 
@@ -143,6 +184,12 @@ func (b *Service) GetUserNotify(user Users) (Users, error) {
 	return user, nil
 }
 
+// UpdateUserNotify обновляет данные о настройках уведомлений пользователя
+//
+// Параметры:
+// - user - данные о пользователе
+//
+// Возвращает ошибку при возникновении проблем с обновлением данных в БД
 func (b *Service) UpdateUserNotify(user Users) error {
 	ctx := context.Background()
 
@@ -161,6 +208,9 @@ func (b *Service) UpdateUserNotify(user Users) error {
 	return nil
 }
 
+// GetUsersWitchNotify получает данные о пользователях, которые хотят получать уведомления
+//
+// Возвращает ошибку при возникновении проблем с получением данных из БД
 func (b *Service) GetUsersWitchNotify() ([]Users, error) {
 	ctx := context.Background()
 
@@ -192,6 +242,14 @@ func (b *Service) GetUsersWitchNotify() ([]Users, error) {
 
 }
 
+// GetExpenseFromDate получает данные о расходах за определенную дату
+//
+// Параметры:
+// - user - данные о пользователе
+// - expese - данные о расходах
+//
+// Возвращает ошибку при возникновении проблем с получением данных из БД
+// или возвращает данные о расходах
 func (b *Service) GetExpenseFromDate(user Users, expese Expenses) (Expenses, error) {
 	ctx := context.Background()
 
