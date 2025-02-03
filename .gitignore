@@ -1,0 +1,8 @@
+# env file
+.env
+# directory 
+/old
+#dir build
+/build
+# DS_Store
+*.DS_Store
