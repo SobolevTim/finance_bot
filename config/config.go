@@ -2,41 +2,116 @@ package config
 
 import (
 	"fmt"
-	"os"
+	"log"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
-// Config структура для хранения конфигурации бота
 type Config struct {
-	BotToken    string
-	DatabaseURL string
-	AdminChat   string
+	App struct {
+		Env  string `mapstructure:"env" validate:"required"`
+		Name string `mapstructure:"name" validate:"required"`
+	}
+	DB    DatabaseConfig `mapstructure:"db"`
+	Redis RedisConfig    `mapstructure:"redis"`
 }
 
-// LoadConfig загружает конфигурацию из переменных окружения
-func LoadConfig() (*Config, error) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		return nil, fmt.Errorf("не удалось загрузить .env файл: %v", err)
+type DatabaseConfig struct {
+	URL       string `mapstructure:"url" validate:"required"`
+	MaxConns  int    `mapstructure:"max_conns" validate:"required"`
+	IdleConns int    `mapstructure:"idle_conns"`
+	Timeout   int    `mapstructure:"timeout"`
+}
+
+type RedisConfig struct {
+	Addr     string `mapstructure:"addr" validate:"required"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+	PoolSize int    `mapstructure:"pool_size"`
+	Timeout  int    `mapstructure:"timeout"`
+}
+
+// LoadConfig загружает конфигурацию с приоритетом:
+//
+// 1. Переменные окружения
+// 2. Файл конфигурации в папке ./config/ с именем {env}.yaml
+// 3. Значения по умолчанию
+//
+// Параметр path - путь к папке с конфигами
+func LoadConfig(path string) (*Config, error) {
+	// Переменные окружения
+	viper.AutomaticEnv()
+
+	// Значения по умолчанию
+	viper.SetDefault("app.env", "default")
+	viper.SetDefault("app.name", "finance_bot")
+	viper.SetDefault("db.max_conns", 10)
+	viper.SetDefault("db.idle_conns", 5)
+
+	// Получаем окружение (из ENV или default)
+	env := viper.GetString("app.env")
+	fmt.Println("Loading configuration for environment:", env)
+
+	viper.SetConfigName(env) // Например, local.yaml, production.yaml
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(path) // Папка с конфигами (например, ./config/)
+
+	// Читаем конфиг из файла (если найден)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Printf("Config file not found: %s.yaml, using ENV or defaults", env)
+	} else {
+		log.Println("Config loaded from:", viper.ConfigFileUsed())
 	}
 
-	cfg := &Config{
-		BotToken:    os.Getenv("BOT_TOKEN"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		AdminChat:   os.Getenv("ADMINID"),
+	// Парсим конфиг
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("не удалось распарсить конфиг: %w", err)
 	}
 
-	// Проверяем наличие обязательных переменных окружения
-	if cfg.BotToken == "" {
-		return nil, fmt.Errorf("не задан BOT_TOKEN")
-	}
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("не задан DATABASE_URL")
-	}
-	if cfg.AdminChat == "" {
-		return nil, fmt.Errorf("не задан ADMINID")
+	// Валидируем конфиг
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("конфиг не прошел валидацию: %w", err)
 	}
 
-	return cfg, nil
+	return &config, nil
+}
+
+// Validate проверяет конфигурацию на валидность
+func (c *Config) Validate() error {
+	if c.App.Env == "" {
+		return fmt.Errorf("env не может быть пустым")
+	}
+	if c.App.Name == "" {
+		return fmt.Errorf("name не может быть пустым")
+	}
+	if c.DB.URL == "" {
+		return fmt.Errorf("db.url не может быть пустым")
+	}
+	if c.DB.MaxConns <= 0 {
+		return fmt.Errorf("db.max_conns не может быть меньше или равно 0")
+	}
+	if c.DB.IdleConns < 0 {
+		return fmt.Errorf("db.idle_conns не может быть меньше 0")
+	}
+	if c.DB.Timeout < 0 {
+		return fmt.Errorf("db.timeout не может быть меньше 0")
+	}
+	if c.DB.Timeout == 0 {
+		c.DB.Timeout = 30
+	}
+	if c.Redis.Addr == "" {
+		return fmt.Errorf("redis.addr не может быть пустым")
+	}
+	if c.Redis.PoolSize <= 0 {
+		return fmt.Errorf("redis.pool_size не может быть меньше или равно 0")
+	}
+	if c.Redis.Timeout < 0 {
+		return fmt.Errorf("redis.timeout не может быть меньше 0")
+	}
+	if c.Redis.Timeout == 0 {
+		c.Redis.Timeout = 30
+	}
+
+	return nil
 }
