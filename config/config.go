@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config - структура конфигурации приложения
 type Config struct {
 	App struct {
 		Env  string `mapstructure:"env" validate:"required"`
@@ -16,6 +17,7 @@ type Config struct {
 	Redis RedisConfig    `mapstructure:"redis"`
 }
 
+// DatabaseConfig - структура конфигурации базы данных
 type DatabaseConfig struct {
 	URL       string `mapstructure:"url" validate:"required"`
 	MaxConns  int    `mapstructure:"max_conns" validate:"required"`
@@ -23,6 +25,7 @@ type DatabaseConfig struct {
 	Timeout   int    `mapstructure:"timeout"`
 }
 
+// RedisConfig - структура конфигурации Redis
 type RedisConfig struct {
 	Addr     string `mapstructure:"addr" validate:"required"`
 	Password string `mapstructure:"password"`
@@ -98,6 +101,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("db.timeout не может быть меньше 0")
 	}
 	if c.DB.Timeout == 0 {
+		log.Println("db.timeout не указан, установлено значение по умолчанию: 30")
 		c.DB.Timeout = 30
 	}
 	if c.Redis.Addr == "" {
@@ -107,6 +111,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("redis.pool_size не может быть меньше или равно 0")
 	}
 	if c.Redis.Timeout < 0 {
+		log.Println("redis.timeout не может быть меньше 0, установлено значение по умолчанию: 30")
 		return fmt.Errorf("redis.timeout не может быть меньше 0")
 	}
 	if c.Redis.Timeout == 0 {
