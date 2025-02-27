@@ -1,5 +1,5 @@
 app:
-  env: local
+  env: default
   name: expense-manager
 
 db:

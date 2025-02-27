@@ -10,28 +10,28 @@ import (
 // Config - структура конфигурации приложения
 type Config struct {
 	App struct {
-		Env  string `mapstructure:"env" validate:"required"`
-		Name string `mapstructure:"name" validate:"required"`
+		Env  string `mapstructure:"env" validate:"required"`  // default, production, development
+		Name string `mapstructure:"name" validate:"required"` // finance_bot
 	}
-	DB    DatabaseConfig `mapstructure:"db"`
-	Redis RedisConfig    `mapstructure:"redis"`
+	DB    DatabaseConfig `mapstructure:"db"`    // DatabaseConfig - структура конфигурации базы данных
+	Redis RedisConfig    `mapstructure:"redis"` // RedisConfig - структура конфигурации Redis
 }
 
 // DatabaseConfig - структура конфигурации базы данных
 type DatabaseConfig struct {
-	URL       string `mapstructure:"url" validate:"required"`
-	MaxConns  int    `mapstructure:"max_conns" validate:"required"`
-	IdleConns int    `mapstructure:"idle_conns"`
-	Timeout   int    `mapstructure:"timeout"`
+	URL       string `mapstructure:"url" validate:"required"`       // URL подключения к БД
+	MaxConns  int    `mapstructure:"max_conns" validate:"required"` // Максимальное количество соединений
+	IdleConns int    `mapstructure:"idle_conns"`                    // Количество простаивающих соединений
+	Timeout   int    `mapstructure:"timeout"`                       // Таймаут подключения
 }
 
 // RedisConfig - структура конфигурации Redis
 type RedisConfig struct {
-	Addr     string `mapstructure:"addr" validate:"required"`
-	Password string `mapstructure:"password"`
-	DB       int    `mapstructure:"db"`
-	PoolSize int    `mapstructure:"pool_size"`
-	Timeout  int    `mapstructure:"timeout"`
+	Addr     string `mapstructure:"addr" validate:"required"` // Адрес подключения к Redis
+	Password string `mapstructure:"password"`                 // Пароль
+	DB       int    `mapstructure:"db"`                       // Номер БД
+	PoolSize int    `mapstructure:"pool_size"`                // Размер пула соединений
+	Timeout  int    `mapstructure:"timeout"`                  // Таймаут подключения
 }
 
 // LoadConfig загружает конфигурацию с приоритетом:
