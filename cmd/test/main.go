@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
-	"log/slog"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/SobolevTim/finance_bot/config"
+	"github.com/SobolevTim/finance_bot/internal/pkg/database"
 	"github.com/SobolevTim/finance_bot/internal/pkg/logger"
 )
 
@@ -17,13 +21,37 @@ func main() {
 
 	// Подключаем логгер
 	logger.InitLogger(config.App.Env)
+	dblogger := logger.GetLogger("database")
+	httplogger := logger.GetLogger("http")
 
-	slog.Info("Test no module logger")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	// Подключаемся к БД
+	db, err := database.NewPostgresStorage(ctx, *config, dblogger)
+	if err != nil {
+		dblogger.Error("failed to connect to DB", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
 
-	// Получаем логгер для модуля
-	testLogger := logger.GetLogger("test")
-	testLogger.Info("Test info logger")
-	testLogger.Debug("Test debug logger")
-	testLogger.Error("Test error logger")
-	testLogger.Warn("Test warn logger")
+	router := http.NewServeMux()
+	router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if err := db.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      router,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	httplogger.Info("Starting server", "port", 8080)
+	if err := server.ListenAndServe(); err != nil {
+		httplogger.Error("server failed", "error", err)
+	}
 }

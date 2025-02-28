@@ -20,8 +20,8 @@ type Config struct {
 // DatabaseConfig - структура конфигурации базы данных
 type DatabaseConfig struct {
 	URL       string `mapstructure:"url" validate:"required"`       // URL подключения к БД
-	MaxConns  int    `mapstructure:"max_conns" validate:"required"` // Максимальное количество соединений
-	IdleConns int    `mapstructure:"idle_conns"`                    // Количество простаивающих соединений
+	MaxConns  int32  `mapstructure:"max_conns" validate:"required"` // Максимальное количество соединений
+	IdleConns int32  `mapstructure:"idle_conns"`                    // Количество простаивающих соединений
 	Timeout   int    `mapstructure:"timeout"`                       // Таймаут подключения
 }
 
