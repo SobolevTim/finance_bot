@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/SobolevTim/finance_bot/config"
-	"github.com/SobolevTim/finance_bot/internal/pkg/database"
+	"github.com/SobolevTim/finance_bot/internal/infrastructure/postgres"
 	"github.com/SobolevTim/finance_bot/internal/pkg/logger"
 )
 
@@ -27,7 +27,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// Подключаемся к БД
-	db, err := database.NewPostgresStorage(ctx, *config, dblogger)
+	db, err := postgres.NewPostgresStorage(ctx, *config, dblogger)
 	if err != nil {
 		dblogger.Error("failed to connect to DB", "error", err)
 		os.Exit(1)
