@@ -1,4 +1,4 @@
-package postgres
+package database
 
 import (
 	"context"
@@ -6,16 +6,17 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/SobolevTim/finance_bot/config"
+	"github.com/SobolevTim/finance_bot/internal/pkg/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type PostgresStorage struct {
+type DatabaseStore struct {
 	DB     *pgxpool.Pool // Пул соединений к БД
 	Logger *slog.Logger  // Логгер для модуля БД
 }
 
-func NewPostgresStorage(ctx context.Context, cfg config.Config, logger *slog.Logger) (*PostgresStorage, error) {
+func NewDatabaseStore(ctx context.Context, cfg config.Config, logger *slog.Logger) (*DatabaseStore, error) {
+	logger.Info("Подключение к БД...", "URL", cfg.DB.URL)
 	config, err := pgxpool.ParseConfig(cfg.DB.URL)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка парсинга DSN: %w", err)
@@ -36,17 +37,17 @@ func NewPostgresStorage(ctx context.Context, cfg config.Config, logger *slog.Log
 	}
 	logger.Info("Подключение к БД установлено")
 
-	return &PostgresStorage{
+	return &DatabaseStore{
 		DB:     pool,
 		Logger: logger,
 	}, nil
 }
 
-func (s *PostgresStorage) Close() {
+func (s *DatabaseStore) Close() {
 	s.DB.Close()
 	s.Logger.Info("Подключение к БД закрыто")
 }
 
-func (s *PostgresStorage) Ping(ctx context.Context) error {
+func (s *DatabaseStore) Ping(ctx context.Context) error {
 	return s.DB.Ping(ctx)
 }

@@ -11,3 +11,4 @@ compose-up:
 
 compose-down:
 	docker-compose -f deployments/docker/docker-compose.yml down
+	docker rmi test-server:latest

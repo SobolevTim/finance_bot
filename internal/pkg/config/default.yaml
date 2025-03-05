@@ -3,7 +3,7 @@ app:
   name: expense-manager
 
 db:
-  url: postgres://user:pass@localhost:5432/expenses?sslmode=disable
+  url: postgres://user:pass@postgres:5432/expenses?sslmode=disable
   max_conns: 10
   idle_conns: 5
 

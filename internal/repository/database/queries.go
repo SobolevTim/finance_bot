@@ -1,4 +1,4 @@
-package postgres
+package database
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/SobolevTim/finance_bot/internal/domain/user"
 )
 
-func (s *PostgresStorage) Create(ctx context.Context, u *user.User) error {
+func (s *DatabaseStore) Create(ctx context.Context, u *user.User) error {
 	query := `INSERT INTO users (id, telegram_id, created_at, timezone) 
               VALUES ($1, $2, $3, $4)`
 

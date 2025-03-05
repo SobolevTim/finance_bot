@@ -1,18 +1,3 @@
-# Этап 1: Сборка приложения
-#FROM golang:1.23.0-alpine AS builder
-#WORKDIR /app
-#COPY go.mod go.sum ./
-#RUN go mod download
-#COPY . .
-#RUN RUN go build -o myapp ./cmd/api
-
-# Этап 2: Создание конечного образа
-#FROM alpine:latest
-#WORKDIR /root/
-#COPY --from=builder /app/myapp .
-#COPY .env .
-#CMD ["./myapp"]
-
 # Используем официальный образ Go для сборки
 FROM golang:1.23.0-alpine AS builder
 
@@ -29,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Компилируем приложение в бинарный файл
-RUN go build -o myapp cmd/api/main.go
+RUN go build -o finance-bot cmd/test/main.go
 
 # Используем минимальный образ на основе Alpine для уменьшения размера
 FROM alpine:latest
@@ -44,8 +29,7 @@ WORKDIR /root/
 COPY --from=builder /app/finance-bot .
 
 # Копируем файл .env (если используется)
-COPY .env .
-COPY internal/database/migration.sql ./internal/database/migration.sql
+COPY internal/pkg/config/default.yaml ./internal/pkg/config/default.yaml
 
 # Команда для запуска приложения
 CMD ["./finance-bot"]
