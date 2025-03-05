@@ -7,14 +7,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/SobolevTim/finance_bot/config"
-	"github.com/SobolevTim/finance_bot/internal/pkg/database"
+	"github.com/SobolevTim/finance_bot/internal/pkg/config"
 	"github.com/SobolevTim/finance_bot/internal/pkg/logger"
+	"github.com/SobolevTim/finance_bot/internal/repository/database"
 )
 
 func main() {
 	// Подключаем конфигурацию
-	config, err := config.LoadConfig("config")
+	config, err := config.LoadConfig("internal/pkg/config")
 	if err != nil {
 		log.Fatalln("Failed to load config:", err)
 	}
@@ -27,7 +27,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// Подключаемся к БД
-	db, err := database.NewPostgresStorage(ctx, *config, dblogger)
+	db, err := database.NewDatabaseStore(ctx, *config, dblogger)
 	if err != nil {
 		dblogger.Error("failed to connect to DB", "error", err)
 		os.Exit(1)
@@ -36,7 +36,10 @@ func main() {
 
 	router := http.NewServeMux()
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+		defer cancel()
 		if err := db.Ping(ctx); err != nil {
+			dblogger.Error("Database ping failed", "error", err)
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
