@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Компилируем приложение в бинарный файл
-RUN go build -o finance-bot cmd/test/main.go
+RUN go build -o finance-bot cmd/telegram-bot/main.go
 
 # Используем минимальный образ на основе Alpine для уменьшения размера
 FROM alpine:latest
@@ -29,7 +29,7 @@ WORKDIR /root/
 COPY --from=builder /app/finance-bot .
 
 # Копируем файл .env (если используется)
-COPY internal/pkg/config/default.yaml ./internal/pkg/config/default.yaml
+# COPY internal/pkg/config/default.yaml ./internal/pkg/config/default.yaml
 
 # Команда для запуска приложения
 CMD ["./finance-bot"]

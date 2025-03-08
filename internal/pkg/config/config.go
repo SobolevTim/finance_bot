@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/spf13/viper"
 )
@@ -13,8 +12,16 @@ type Config struct {
 		Env  string `mapstructure:"env" validate:"required"`  // default, production, development
 		Name string `mapstructure:"name" validate:"required"` // finance_bot
 	}
+	TG    TGConfig       `mapstructure:"tg"`    // TGConfig - структура конфигурации Telegram
 	DB    DatabaseConfig `mapstructure:"db"`    // DatabaseConfig - структура конфигурации базы данных
 	Redis RedisConfig    `mapstructure:"redis"` // RedisConfig - структура конфигурации Redis
+}
+
+// TGConfig - структура конфигурации Telegram
+type TGConfig struct {
+	Token       string `mapstructure:"token"`        // Токен бота
+	TypePolling string `mapstructure:"type_polling"` // Тип опроса бота
+	Debug       bool   `mapstructure:"debug"`        // Режим отладки
 }
 
 // DatabaseConfig - структура конфигурации базы данных
@@ -45,11 +52,17 @@ func LoadConfig(path string) (*Config, error) {
 	// Переменные окружения
 	viper.AutomaticEnv()
 
+	viper.BindEnv("tg.token", "TG_TOKEN")
+
 	// Значения по умолчанию
 	viper.SetDefault("app.env", "default")
 	viper.SetDefault("app.name", "finance_bot")
+	viper.SetDefault("tg.debug", false)
+	viper.SetDefault("tg.type_polling", "longpolling")
 	viper.SetDefault("db.max_conns", 10)
 	viper.SetDefault("db.idle_conns", 5)
+	viper.SetDefault("db.timeout", 30)
+	viper.SetDefault("redis.timeout", 30)
 
 	// Получаем окружение (из ENV или default)
 	env := viper.GetString("app.env")
@@ -61,9 +74,9 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Читаем конфиг из файла (если найден)
 	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("Config file not found: %s.yaml, using ENV or defaults", env)
+		fmt.Printf("Config file not found: %s.yaml, using ENV or defaults", env)
 	} else {
-		log.Println("Config loaded from:", viper.ConfigFileUsed())
+		fmt.Println("Config loaded from:", viper.ConfigFileUsed())
 	}
 
 	// Парсим конфиг
@@ -88,6 +101,9 @@ func (c *Config) Validate() error {
 	if c.App.Name == "" {
 		return fmt.Errorf("name не может быть пустым")
 	}
+	if c.TG.Token == "" {
+		return fmt.Errorf("telegram.token не может быть пустым")
+	}
 	if c.DB.URL == "" {
 		return fmt.Errorf("db.url не может быть пустым")
 	}
@@ -100,9 +116,8 @@ func (c *Config) Validate() error {
 	if c.DB.Timeout < 0 {
 		return fmt.Errorf("db.timeout не может быть меньше 0")
 	}
-	if c.DB.Timeout == 0 {
-		log.Println("db.timeout не указан, установлено значение по умолчанию: 30")
-		c.DB.Timeout = 30
+	if c.DB.Timeout <= 0 {
+		return fmt.Errorf("db.timeout не может быть меньше или равно 0")
 	}
 	if c.Redis.Addr == "" {
 		return fmt.Errorf("redis.addr не может быть пустым")
@@ -111,11 +126,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("redis.pool_size не может быть меньше или равно 0")
 	}
 	if c.Redis.Timeout < 0 {
-		log.Println("redis.timeout не может быть меньше 0, установлено значение по умолчанию: 30")
 		return fmt.Errorf("redis.timeout не может быть меньше 0")
 	}
-	if c.Redis.Timeout == 0 {
-		c.Redis.Timeout = 30
+	if c.Redis.Timeout <= 0 {
+		return fmt.Errorf("redis.timeout не может быть меньше или равно 0")
 	}
 
 	return nil

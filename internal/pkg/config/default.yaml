@@ -2,6 +2,11 @@ app:
   env: default
   name: expense-manager
 
+tg:
+  type_polling: long_polling
+  debug: false
+
+
 db:
   url: postgres://user:pass@postgres:5432/expenses?sslmode=disable
   max_conns: 10
