@@ -9,6 +9,9 @@ services:
     environment:
       DB_URL: postgres://user:pass@postgres:5432/expenses?sslmode=disable
       REDIS_URL: redis://redis:6379
+      TG_TOKEN: ${TG_TOKEN}
+    volumes:
+      - ../../internal/pkg/config/:/root/internal/pkg/config/
     networks:
       - postgres
       - redis
