@@ -1,4 +1,4 @@
-.PHONY: migrate-up migrate-down compose-up compose-down
+.PHONY: migrate-up migrate-down up down
 
 migrate-up:
 	migrate -path migrations -database "$(DB_URL)" up
@@ -6,9 +6,9 @@ migrate-up:
 migrate-down:
 	migrate -path migrations -database "$(DB_URL)" down
 
-compose-up:
+up:
 	docker-compose -f deployments/docker/docker-compose.yml up -d
 
-compose-down:
+down:
 	docker-compose -f deployments/docker/docker-compose.yml down
 	docker rmi test-server:latest
