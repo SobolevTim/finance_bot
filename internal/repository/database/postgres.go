@@ -10,12 +10,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type DatabaseStore struct {
+type UserRepository struct {
 	DB     *pgxpool.Pool // Пул соединений к БД
 	Logger *slog.Logger  // Логгер для модуля БД
 }
 
-func NewDatabaseStore(ctx context.Context, cfg config.Config, logger *slog.Logger) (*DatabaseStore, error) {
+func NewUserRepository(ctx context.Context, cfg config.Config, logger *slog.Logger) (*UserRepository, error) {
 	logger.Info("Подключение к БД...", "URL", cfg.DB.URL)
 	config, err := pgxpool.ParseConfig(cfg.DB.URL)
 	if err != nil {
@@ -37,17 +37,17 @@ func NewDatabaseStore(ctx context.Context, cfg config.Config, logger *slog.Logge
 	}
 	logger.Info("Подключение к БД установлено")
 
-	return &DatabaseStore{
+	return &UserRepository{
 		DB:     pool,
 		Logger: logger,
 	}, nil
 }
 
-func (s *DatabaseStore) Close() {
+func (s *UserRepository) Close() {
 	s.DB.Close()
 	s.Logger.Info("Подключение к БД закрыто")
 }
 
-func (s *DatabaseStore) Ping(ctx context.Context) error {
+func (s *UserRepository) Ping(ctx context.Context) error {
 	return s.DB.Ping(ctx)
 }

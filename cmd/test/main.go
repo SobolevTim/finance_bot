@@ -27,7 +27,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	// Подключаемся к БД
-	db, err := database.NewDatabaseStore(ctx, *config, dblogger)
+	db, err := database.NewUserRepository(ctx, *config, dblogger)
 	if err != nil {
 		dblogger.Error("failed to connect to DB", "error", err)
 		os.Exit(1)

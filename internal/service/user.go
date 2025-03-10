@@ -15,13 +15,13 @@ func NewUserService(repo user.Repository) *UserService {
 }
 
 // RegisterUser обрабатывает логику регистрации
-func (s *UserService) RegisterUser(ctx context.Context, telegramID string) (*user.User, error) {
+func (s *UserService) RegisterUser(ctx context.Context, telegramID, UserName, FirstName, LastName string) (*user.User, error) {
 	existingUser, err := s.repo.GetByTelegramID(ctx, telegramID)
 	if err == nil {
 		return existingUser, nil // Пользователь уже существует
 	}
 
-	newUser, err := user.New(telegramID)
+	newUser, err := user.New(telegramID, UserName, FirstName, LastName)
 	if err != nil {
 		return nil, err
 	}
