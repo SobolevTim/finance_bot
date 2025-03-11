@@ -10,12 +10,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type UserRepository struct {
+type Repository struct {
 	DB     *pgxpool.Pool // Пул соединений к БД
 	Logger *slog.Logger  // Логгер для модуля БД
 }
 
-func NewUserRepository(ctx context.Context, cfg config.Config, logger *slog.Logger) (*UserRepository, error) {
+func NewUserRepository(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Repository, error) {
 	logger.Info("Подключение к БД...", "URL", cfg.DB.URL)
 	config, err := pgxpool.ParseConfig(cfg.DB.URL)
 	if err != nil {
@@ -37,17 +37,18 @@ func NewUserRepository(ctx context.Context, cfg config.Config, logger *slog.Logg
 	}
 	logger.Info("Подключение к БД установлено")
 
-	return &UserRepository{
+	return &Repository{
 		DB:     pool,
 		Logger: logger,
 	}, nil
 }
 
-func (s *UserRepository) Close() {
+func (s *Repository) Close() {
 	s.DB.Close()
 	s.Logger.Info("Подключение к БД закрыто")
 }
 
-func (s *UserRepository) Ping(ctx context.Context) error {
+func (s *Repository) Ping(ctx context.Context) error {
+	s.Logger.Debug("Проверка соединения с БД...")
 	return s.DB.Ping(ctx)
 }

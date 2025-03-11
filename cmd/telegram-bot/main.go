@@ -28,14 +28,14 @@ func main() {
 	// Подключаем репозитории
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	userRepo, err := database.NewUserRepository(ctx, *config, bdlogger)
+	repo, err := database.NewUserRepository(ctx, *config, bdlogger)
 	if err != nil {
 		bdlogger.Error("ошибка при создании user repository", "error", err)
 		os.Exit(1)
 	}
 
 	// Подключаем сервисы
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(repo, repo)
 
 	// Создаем бота
 	bot, err := telegram.NewBot(config.TG.Token, userService, tglogger, config.TG.Debug)

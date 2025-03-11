@@ -95,3 +95,11 @@ func (b *Bot) SendMessage(id int64, text string) {
 	b.Client.SendMessage(ctx, msg)
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
 }
+
+func (b *Bot) SendMessageWitchKeyBoard(id int64, text string, keyboard telego.ReplyMarkup) {
+	msg := tu.Message(tu.ID(id), text).WithReplyMarkup(keyboard)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	b.Client.SendMessage(ctx, msg)
+	b.logger.Debug("Отправка сообщения с клавиаторой", "message", msg.Text, "chatID", msg.ChatID, "keyboard", keyboard)
+}
