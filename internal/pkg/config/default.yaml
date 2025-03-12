@@ -3,7 +3,7 @@ app:
   name: expense-manager
 
 tg:
-  type_polling: long_polling
+  type_polling: longpolling
   debug: false
 
 
