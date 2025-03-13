@@ -7,16 +7,15 @@ import (
 	"time"
 
 	"github.com/mymmrac/telego"
-	tu "github.com/mymmrac/telego/telegoutil"
 )
 
 func (b *Bot) handlersCmd(update telego.Update) {
 	b.logger.Debug("Получена команда", "command", update.Message.Text, "tgID", update.Message.Chat.ID)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	switch update.Message.Text {
 	case "/start":
-		b.handlersStart(ctx, update)
+		b.handlersStart(update)
+	case "/cancel":
+		b.handkersCancel(update)
 	case "/help":
 		// TODO: Добавить обработку команды help
 	default:
@@ -25,12 +24,16 @@ func (b *Bot) handlersCmd(update telego.Update) {
 	}
 }
 
-func (b *Bot) handlersStart(ctx context.Context, update telego.Update) {
+func (b *Bot) handlersStart(update telego.Update) {
 	b.logger.Debug("Обработка команды start", "tgID", update.Message.Chat.ID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
 	// Регистрация пользователя в базе данных
 	tgID := strconv.FormatInt(update.Message.Chat.ID, 10)
 	user, budget, err := b.UserService.RegisterUser(ctx, tgID, update.Message.From.Username, update.Message.From.FirstName, update.Message.From.LastName)
+
 	if err != nil {
 		b.logger.Error("Ошибка регистрации пользователя", "error", err)
 		b.SendErrorMessage(update.Message.Chat.ID, "Ошибка регистрации пользователя")
@@ -39,7 +42,10 @@ func (b *Bot) handlersStart(ctx context.Context, update telego.Update) {
 
 	if budget.Amount == 0 {
 		b.logger.Debug("Бюджет не установлен", "tgID", update.Message.Chat.ID)
-		b.requestBudget(update.Message.Chat.ID)
+		text := "Для начала работы укажите ваш бюджет на месяц"
+		b.SendMessage(update.Message.Chat.ID, text)
+
+		b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
 		return
 	}
 
@@ -50,20 +56,19 @@ func (b *Bot) handlersStart(ctx context.Context, update telego.Update) {
 	b.SendMessage(update.Message.Chat.ID, text)
 }
 
-func (b *Bot) requestBudget(chatID int64) {
-	b.logger.Debug("Запрос бюджета", "tgID", chatID)
+func (b *Bot) handkersCancel(update telego.Update) {
+	b.logger.Debug("Обработка команды cancel", "tgID", update.Message.Chat.ID)
 
-	// Формирование сообщения
-	text := "Для начала работы укажите ваш бюджет на месяц"
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-	// Формирование клавиатуры
-	inlineKeyboard := tu.InlineKeyboard(
-		tu.InlineKeyboardRow( // Row 1
-			tu.InlineKeyboardButton("Прибавить на 1000"). // Column 1
-									WithCallbackData("callback_1"),
-			tu.InlineKeyboardButton("Убавить на 1000"). // Column 2
-									WithCallbackData("callback_2"),
-		),
-	)
-	b.SendMessageWitchKeyBoard(chatID, text, inlineKeyboard)
+	err := b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, "")
+	if err != nil {
+		b.logger.Error("Ошибка обновления статуса", "error", err)
+		b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	text := "Операция отменена"
+	b.SendMessage(update.Message.Chat.ID, text)
 }

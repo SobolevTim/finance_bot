@@ -10,6 +10,7 @@ import (
 	"github.com/SobolevTim/finance_bot/internal/pkg/config"
 	"github.com/SobolevTim/finance_bot/internal/pkg/logger"
 	"github.com/SobolevTim/finance_bot/internal/repository/database"
+	"github.com/SobolevTim/finance_bot/internal/repository/memory"
 	"github.com/SobolevTim/finance_bot/internal/service"
 )
 
@@ -24,6 +25,7 @@ func main() {
 	logger.InitLogger(config.App.Env)
 	tglogger := logger.GetLogger("telegram")
 	bdlogger := logger.GetLogger("database")
+	memlogger := logger.GetLogger("memorydb")
 
 	// Подключаем репозитории
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -33,12 +35,23 @@ func main() {
 		bdlogger.Error("ошибка при создании user repository", "error", err)
 		os.Exit(1)
 	}
+	defer repo.Close()
+
+	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	repoMem, err := memory.NewMemoryRepository(ctx, *config, memlogger)
+	if err != nil {
+		memlogger.Error("ошибка при создании memory repository", "error", err)
+		os.Exit(1)
+	}
+	defer repo.Close()
+	defer repoMem.Close()
 
 	// Подключаем сервисы
 	userService := service.NewUserService(repo, repo)
+	statusMemory := service.NewStatusMemory(repoMem)
 
 	// Создаем бота
-	bot, err := telegram.NewBot(config.TG.Token, userService, tglogger, config.TG.Debug)
+	bot, err := telegram.NewBot(config.TG.Token, userService, statusMemory, tglogger, config.TG.Debug)
 	if err != nil {
 		tglogger.Error("ошибка создания бота", "error", err)
 		os.Exit(1)
