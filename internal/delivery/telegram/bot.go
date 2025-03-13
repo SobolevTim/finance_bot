@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/SobolevTim/finance_bot/internal/service"
@@ -13,12 +12,13 @@ import (
 )
 
 type Bot struct {
-	Client      *telego.Bot
-	UserService *service.UserService
-	logger      *slog.Logger
+	Client       *telego.Bot
+	UserService  *service.UserService
+	StatusMemory *service.StatusMemory
+	logger       *slog.Logger
 }
 
-func NewBot(token string, userService *service.UserService, logger *slog.Logger, debug bool) (*Bot, error) {
+func NewBot(token string, userService *service.UserService, statusMem *service.StatusMemory, logger *slog.Logger, debug bool) (*Bot, error) {
 	logger.Debug("Создание бота с токеном", "token", token)
 	logger.Debug("Дебаг режим бота", "debug", debug)
 
@@ -34,9 +34,10 @@ func NewBot(token string, userService *service.UserService, logger *slog.Logger,
 	}
 	logger.Info("Авторизация бота", "bot", bot.Username, "id", bot.ID, "firstName", bot.FirstName, "lastName", bot.LastName)
 	return &Bot{
-		Client:      client,
-		UserService: userService,
-		logger:      logger,
+		Client:       client,
+		UserService:  userService,
+		StatusMemory: statusMem,
+		logger:       logger,
 	}, nil
 }
 
@@ -71,11 +72,9 @@ func (b *Bot) StartPooling() {
 	}
 
 	for update := range updates {
-		b.logger.Debug("update", "update", update)
+		b.logger.Debug("Получено обновление", "update", update)
 		if update.Message != nil {
-			if strings.HasPrefix(update.Message.Text, "/") {
-				go b.handlersCmd(update)
-			}
+			b.handlers(update)
 		}
 	}
 }

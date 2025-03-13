@@ -19,7 +19,7 @@ type Budget struct {
 	Amount     int64     // Сумма * 100
 	Currency   string    // Валюта
 	Date       time.Time // Дата
-	UpdateDate string    // Дата обновления
+	UpdateDate time.Time // Дата обновления
 }
 
 func NewBudget(telegramID string, amount int64, currency string) (*Budget, error) {
