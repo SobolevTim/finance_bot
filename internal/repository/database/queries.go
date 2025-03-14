@@ -7,6 +7,12 @@ import (
 	"github.com/SobolevTim/finance_bot/internal/domain/user"
 )
 
+// Create создает нового пользователя
+//
+// ctx - контекст
+// u - пользователь
+//
+// Возвращает ошибку
 func (s *Repository) Create(ctx context.Context, u *user.User) error {
 	// формируем запрос
 	query := `INSERT INTO users (id, telegram_id, user_name, first_name, last_name, created_at, timezone) 
@@ -20,6 +26,12 @@ func (s *Repository) Create(ctx context.Context, u *user.User) error {
 	return err
 }
 
+// GetByTelegramID ищет пользователя по telegramID
+//
+// ctx - контекст
+// telegramID - telegramID пользователя
+//
+// Возвращает пользователя или ошибку
 func (s *Repository) GetByTelegramID(ctx context.Context, telegramID string) (*user.User, error) {
 	// формируем запрос
 	query := `SELECT id, telegram_id, user_name, first_name, last_name, created_at, timezone
@@ -39,6 +51,12 @@ func (s *Repository) GetByTelegramID(ctx context.Context, telegramID string) (*u
 	return u, nil
 }
 
+// UpdateTimeZone обновляет часовой пояс пользователя
+//
+// ctx - контекст
+// u - пользователь
+//
+// Возвращает ошибку
 func (s *Repository) UpdateTimeZone(ctx context.Context, u *user.User) error {
 	// формируем запрос
 	query := `UPDATE users
@@ -54,6 +72,12 @@ func (s *Repository) UpdateTimeZone(ctx context.Context, u *user.User) error {
 	return nil
 }
 
+// CreateBudget создает новый бюджет
+//
+// ctx - контекст
+// b - бюджет
+//
+// Возвращает ошибку
 func (s *Repository) CreateBudget(ctx context.Context, b *budget.Budget) error {
 	// формируем запрос
 	query := `INSERT INTO budgets (id, telegram_id, amount, currency, created_at) 
@@ -67,6 +91,11 @@ func (s *Repository) CreateBudget(ctx context.Context, b *budget.Budget) error {
 	return err
 }
 
+// GetBudgetByTelegramID ищет бюджет по telegramID
+// ctx - контекст
+// telegramID - telegramID пользователя
+//
+// Возвращает бюджет или ошибку
 func (s *Repository) GetBudgetByTelegramID(ctx context.Context, telegramID string) (*budget.Budget, error) {
 	// TODO: добавить обработку ошибки, если бюджет не найден
 
@@ -89,6 +118,12 @@ func (s *Repository) GetBudgetByTelegramID(ctx context.Context, telegramID strin
 	return b, nil
 }
 
+// UpdateBudget обновляет бюджет
+//
+// ctx - контекст
+// b - бюджет
+//
+// Возвращает ошибку
 func (s *Repository) UpdateBudget(ctx context.Context, b *budget.Budget) error {
 	// формируем запрос
 	query := `UPDATE budgets

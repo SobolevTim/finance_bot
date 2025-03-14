@@ -11,13 +11,23 @@ import (
 	tu "github.com/mymmrac/telego/telegoutil"
 )
 
+// Bot структура бота
 type Bot struct {
-	Client       *telego.Bot
-	UserService  *service.UserService
-	StatusMemory *service.StatusMemory
-	logger       *slog.Logger
+	Client       *telego.Bot           // Клиент телеграма
+	UserService  *service.UserService  // Сервис для работы с пользователями
+	StatusMemory *service.StatusMemory // Сервис для работы со статусами
+	logger       *slog.Logger          // Логгер
 }
 
+// NewBot создает новый экземпляр бота
+//
+// token - токен бота
+// userService - сервис для работы с пользователями
+// statusMem - сервис для работы со статусами
+// logger - логгер
+// debug - режим отладки
+//
+// Возвращает новый экземпляр бота или ошибку
 func NewBot(token string, userService *service.UserService, statusMem *service.StatusMemory, logger *slog.Logger, debug bool) (*Bot, error) {
 	logger.Debug("Создание бота с токеном", "token", token)
 	logger.Debug("Дебаг режим бота", "debug", debug)
@@ -41,6 +51,9 @@ func NewBot(token string, userService *service.UserService, statusMem *service.S
 	}, nil
 }
 
+// StartBot запускает бота
+//
+// polingType - тип работы бота
 func (b *Bot) StartBot(polingType string) {
 	if polingType == "longpolling" {
 		b.logger.Debug("Запуск бота", "polingType", "longpolling")
@@ -53,6 +66,7 @@ func (b *Bot) StartBot(polingType string) {
 
 }
 
+// StartPooling запускает бота с использованием longpolling
 func (b *Bot) StartPooling() {
 	updates, err := b.Client.UpdatesViaLongPolling(
 		// TODO добавить контекст для завершения работы
@@ -79,6 +93,10 @@ func (b *Bot) StartPooling() {
 	}
 }
 
+// SendErrorMessage отправляет сообщение об ошибке
+//
+// id - идентификатор чата
+// text - текст сообщения
 func (b *Bot) SendErrorMessage(id int64, text string) {
 	msg := tu.Message(tu.ID(id), "❌ "+text)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -87,18 +105,14 @@ func (b *Bot) SendErrorMessage(id int64, text string) {
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
 }
 
+// SendMessage отправляет сообщение
+//
+// id - идентификатор чата
+// text - текст сообщения
 func (b *Bot) SendMessage(id int64, text string) {
 	msg := tu.Message(tu.ID(id), text)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	b.Client.SendMessage(ctx, msg)
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
-}
-
-func (b *Bot) SendMessageWitchKeyBoard(id int64, text string, keyboard telego.ReplyMarkup) {
-	msg := tu.Message(tu.ID(id), text).WithReplyMarkup(keyboard)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	b.Client.SendMessage(ctx, msg)
-	b.logger.Debug("Отправка сообщения с клавиаторой", "message", msg.Text, "chatID", msg.ChatID, "keyboard", keyboard)
 }

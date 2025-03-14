@@ -10,12 +10,19 @@ import (
 	"github.com/mymmrac/telego"
 )
 
+// handlers обработка сообщений
+//
+// Обработка команд;
+// Получение статуса;
+// Обработка статуса;
+// Обработка сообщения;
 func (b *Bot) handlers(update telego.Update) {
 	b.logger.Debug("Получено сообщение", "message", update.Message.Text, "tgID", update.Message.Chat.ID)
 
 	// Обработка команд
 	if strings.HasPrefix(update.Message.Text, "/") {
 		b.handlersCmd(update)
+		return
 	}
 
 	// Получение статуса
@@ -31,10 +38,17 @@ func (b *Bot) handlers(update telego.Update) {
 	// Обработка статуса
 	if status != "" {
 		b.handlerStatus(status, update)
+		return
 	}
+
+	// Обработка сообщения
+	b.handlersMessage(update)
 
 }
 
+// handlerStatus обработка статуса
+//
+// Обработка статуса "budget" - установка бюджета
 func (b *Bot) handlerStatus(status string, update telego.Update) {
 	b.logger.Debug("Обработка статуса", "status", status, "tgID", update.Message.Chat.ID)
 	switch status {
@@ -46,6 +60,10 @@ func (b *Bot) handlerStatus(status string, update telego.Update) {
 	}
 }
 
+// requestBudget запрос бюджета
+//
+// Запрос бюджета у пользователя и обновление в базе данных
+// Отправка сообщения о результате
 func (b *Bot) requestBudget(update telego.Update) {
 	chatID := update.Message.Chat.ID
 	b.logger.Debug("Запрос бюджета", "tgID", chatID)
@@ -75,4 +93,9 @@ func (b *Bot) requestBudget(update telego.Update) {
 
 	text := fmt.Sprintf("Бюджет на месяц установлен: %d", amount)
 	b.SendMessage(chatID, text)
+}
+
+func (b *Bot) handlersMessage(update telego.Update) {
+	b.logger.Debug("Обработка общих сообщений", "tgID", update.Message.Chat.ID)
+	//TODO обработка записи трат
 }
