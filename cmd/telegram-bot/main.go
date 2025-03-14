@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	"github.com/SobolevTim/finance_bot/internal/delivery/telegram"
@@ -33,15 +32,16 @@ func main() {
 	repo, err := database.NewUserRepository(ctx, *config, bdlogger)
 	if err != nil {
 		bdlogger.Error("ошибка при создании user repository", "error", err)
-		os.Exit(1)
+		return
 	}
 	defer repo.Close()
 
 	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	repoMem, err := memory.NewMemoryRepository(ctx, *config, memlogger)
 	if err != nil {
 		memlogger.Error("ошибка при создании memory repository", "error", err)
-		os.Exit(1)
+		return
 	}
 	defer repo.Close()
 	defer repoMem.Close()
@@ -54,7 +54,7 @@ func main() {
 	bot, err := telegram.NewBot(config.TG.Token, userService, statusMemory, tglogger, config.TG.Debug)
 	if err != nil {
 		tglogger.Error("ошибка создания бота", "error", err)
-		os.Exit(1)
+		return
 	}
 
 	// Запускаем бота

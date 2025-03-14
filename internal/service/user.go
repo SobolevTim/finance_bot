@@ -19,7 +19,7 @@ func NewUserService(userRepo user.Repository, budgetRepo budget.Repository) *Use
 }
 
 // RegisterUser обрабатывает логику регистрации
-func (s *UserService) RegisterUser(ctx context.Context, telegramID, UserName, FirstName, LastName string) (*user.User, *budget.Budget, error) {
+func (s *UserService) RegisterUser(ctx context.Context, telegramID, userName, firstName, lastName string) (*user.User, *budget.Budget, error) {
 	existingUser, err := s.userRepo.GetByTelegramID(ctx, telegramID)
 	if err == nil {
 		budget, err := s.budgetRepo.GetBudgetByTelegramID(ctx, telegramID)
@@ -29,7 +29,7 @@ func (s *UserService) RegisterUser(ctx context.Context, telegramID, UserName, Fi
 		return existingUser, budget, nil
 	}
 
-	newUser, err := user.New(telegramID, UserName, FirstName, LastName)
+	newUser, err := user.New(telegramID, userName, firstName, lastName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ошибка при создании пользователя: %w", err)
 	}
@@ -50,7 +50,7 @@ func (s *UserService) RegisterUser(ctx context.Context, telegramID, UserName, Fi
 	return newUser, defaultBudget, nil
 }
 
-func (s *UserService) UpdateBudget(ctx context.Context, id int64, amount int64) error {
+func (s *UserService) UpdateBudget(ctx context.Context, id, amount int64) error {
 	tgID := strconv.FormatInt(id, 10)
 	_, err := s.budgetRepo.GetBudgetByTelegramID(ctx, tgID)
 	if err != nil {

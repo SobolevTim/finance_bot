@@ -14,7 +14,7 @@ import (
 // status - статус пользователя
 //
 // Возвращает ошибку при возникновении проблем с Redis
-func (r *MemoryRepository) SetStatus(ctx context.Context, telegramID string, status string) error {
+func (r *MemoryRepository) SetStatus(ctx context.Context, telegramID, status string) error {
 	r.logger.Debug("Установка статуса пользователя в Redis", "TelegramID", telegramID, "Status", status)
 	now := time.Now()
 	err := r.rdb.Set(ctx, telegramID, status, time.Hour*24).Err() // Статус хранится 24 часа

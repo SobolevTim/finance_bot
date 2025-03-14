@@ -58,7 +58,11 @@ func (b *Bot) handlersStart(update telego.Update) {
 		text := "Для начала работы укажите ваш бюджет на месяц"
 		b.SendMessage(update.Message.Chat.ID, text)
 
-		b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
+		err := b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
+		if err != nil {
+			b.logger.Error("Ошибка обновления статуса", "error", err)
+			b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
+		}
 		return
 	}
 

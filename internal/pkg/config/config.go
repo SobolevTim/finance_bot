@@ -52,7 +52,10 @@ func LoadConfig(path string) (*Config, error) {
 	// Переменные окружения
 	viper.AutomaticEnv()
 
-	viper.BindEnv("tg.token", "TG_TOKEN")
+	err := viper.BindEnv("tg.token", "TG_TOKEN") // Привязываем переменную окружения к ключу в конфиге
+	if err != nil {
+		return nil, fmt.Errorf("не удалось привязать переменную окружения к ключу в конфиге: %w", err)
+	}
 
 	// Значения по умолчанию
 	viper.SetDefault("app.env", "default")

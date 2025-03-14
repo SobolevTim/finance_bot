@@ -97,5 +97,5 @@ func (b *Bot) requestBudget(update telego.Update) {
 
 func (b *Bot) handlersMessage(update telego.Update) {
 	b.logger.Debug("Обработка общих сообщений", "tgID", update.Message.Chat.ID)
-	//TODO обработка записи трат
+	// TODO обработка записи трат
 }
