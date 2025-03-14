@@ -132,15 +132,16 @@ func toPostfix(expression string) ([]string, error) {
 	for i := 0; i < len(expression); i++ {
 		ch := rune(expression[i])
 
-		if unicode.IsDigit(ch) || ch == '.' {
+		switch {
+		case unicode.IsDigit(ch) || ch == '.':
 			start := i
 			for i+1 < len(expression) && (unicode.IsDigit(rune(expression[i+1])) || expression[i+1] == '.') {
 				i++
 			}
 			result = append(result, expression[start:i+1])
-		} else if ch == '(' {
+		case ch == '(':
 			stack = append(stack, ch)
-		} else if ch == ')' {
+		case ch == ')':
 			for len(stack) > 0 && stack[len(stack)-1] != '(' {
 				result = append(result, string(stack[len(stack)-1]))
 				stack = stack[:len(stack)-1]
@@ -149,7 +150,7 @@ func toPostfix(expression string) ([]string, error) {
 				return nil, errors.New("несоответствие скобок")
 			}
 			stack = stack[:len(stack)-1]
-		} else if isOperator(ch) {
+		case isOperator(ch):
 			for len(stack) > 0 && precedence(stack[len(stack)-1]) >= precedence(ch) {
 				if ch == '^' && stack[len(stack)-1] == '^' {
 					break // ^ — правоассоциативный оператор
@@ -158,7 +159,7 @@ func toPostfix(expression string) ([]string, error) {
 				stack = stack[:len(stack)-1]
 			}
 			stack = append(stack, ch)
-		} else {
+		default:
 			return nil, errors.New("неизвестный символ в выражении")
 		}
 	}

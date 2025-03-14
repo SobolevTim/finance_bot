@@ -1,0 +1,72 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  issues-exit-code: 1
+  tests: false
+
+output:
+  formats:
+    - format: colored-line-number
+      print-issued-lines: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - revive
+    - unconvert
+    - ineffassign
+    - gocritic
+    - bodyclose
+    - durationcheck
+
+linters-settings:
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - experimental
+    disabled-checks:
+      - hugeParam
+  
+  revive:
+    rules:
+      - name: context-as-argument
+      - name: error-return
+      - name: error-strings
+  
+  gosec:
+    excludes:
+      - G104
+      - G307
+
+issues:
+  exclude-rules:
+    # Игнорировать тестовые файлы
+    - path: _test\.go
+      linters:
+        - errcheck
+    
+    # Игнорировать internal пакеты
+    - path: internal/.*
+      linters:
+        - gosec
+    
+    # Игнорировать автосгенерированные файлы
+    - path: ".*\\.pb\\.go"
+      linters:
+        - revive
+    
+    # Игнорировать моки
+    - path: ".*\\/mocks\\/.*"
+      linters:
+        - govet
+    
+    # Исключения для конкретных ошибок
+    - text: "Error return value of .* is not checked"
+      linters:
+        - errcheck
+      source: "//nolint:errcheck"

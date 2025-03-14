@@ -101,7 +101,11 @@ func (b *Bot) SendErrorMessage(id int64, text string) {
 	msg := tu.Message(tu.ID(id), "❌ "+text)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	b.Client.SendMessage(ctx, msg)
+	_, err := b.Client.SendMessage(ctx, msg)
+	if err != nil {
+		b.logger.Error("Ошибка отправки сообщения", "error", err)
+		return
+	}
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
 }
 
@@ -113,6 +117,10 @@ func (b *Bot) SendMessage(id int64, text string) {
 	msg := tu.Message(tu.ID(id), text)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	b.Client.SendMessage(ctx, msg)
+	_, err := b.Client.SendMessage(ctx, msg)
+	if err != nil {
+		b.logger.Error("Ошибка отправки сообщения", "error", err)
+		return
+	}
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
 }

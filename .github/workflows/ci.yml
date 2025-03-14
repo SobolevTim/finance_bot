@@ -1,0 +1,109 @@
+name: Expense Manager CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: "1.23"  # Базовая версия
+  DB_NAME: expenses_test
+  REDIS_PORT: 6379
+
+jobs:
+  test:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20  # Защита от зависаний
+    
+    # Матрица для тестирования разных окружений
+    strategy:
+      matrix:
+        go: ["1.21", "1.22", "1.23"]
+        postgres: ["15-alpine", "16-alpine"]
+        redis: ["6-alpine", "7-alpine"]
+      fail-fast: false  # Позволяет завершить все тесты в матрице
+    
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+          POSTGRES_DB: ${{ env.DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_user -d ${{ env.DB_NAME }}"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:${{ matrix.redis }}
+        ports:
+          - ${{ env.REDIS_PORT }}:${{ env.REDIS_PORT }}
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go ${{ matrix.go }}
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go }}-
+
+    - name: Install tools
+      run: |
+        go install golang.org/x/tools/cmd/goimports@latest
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+    - name: Check code format
+      run: |
+        gofmt -d -e -s .
+        goimports -d .
+
+    - name: Lint code
+      run: golangci-lint run --timeout 5m --tests=false
+
+    - name: Run unit tests
+      run: go test -v -short -race ./...
+      env:
+        GOFLAGS: "-buildvcs=false"  # Для кеширования
+
+    - name: Run integration tests
+      run: |
+        go test -v -race ./test/integration/... -count=1
+      env:
+        DB_URL: postgres://test_user:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}?sslmode=disable
+        REDIS_ADDR: localhost:${{ env.REDIS_PORT }}
+
+    - name: Code coverage
+      run: |
+        go test -coverprofile=coverage.out -covermode=atomic ./...
+        go tool cover -html=coverage.out -o coverage.html
+      continue-on-error: true  # Не прерывать весь workflow
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: |
+          coverage.out
+          coverage.html

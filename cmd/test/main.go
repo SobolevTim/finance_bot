@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/SobolevTim/finance_bot/internal/pkg/config"
@@ -30,7 +29,7 @@ func main() {
 	db, err := database.NewUserRepository(ctx, *config, dblogger)
 	if err != nil {
 		dblogger.Error("failed to connect to DB", "error", err)
-		os.Exit(1)
+		return
 	}
 	defer db.Close()
 
