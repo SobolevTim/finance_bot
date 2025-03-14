@@ -1,5 +1,5 @@
 package telegram
 
 var (
-	StatusBudget = "budget"
+	StatusBudget = "budget" // Статус установки бюджета "budget"
 )

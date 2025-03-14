@@ -10,11 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Repository структура репозитория
 type Repository struct {
 	DB     *pgxpool.Pool // Пул соединений к БД
 	Logger *slog.Logger  // Логгер для модуля БД
 }
 
+// NewUserRepository создает новый экземпляр репозитория
+//
+// ctx - контекст
+// cfg - конфигурация
+// logger - логгер
+//
+// Возвращает новый экземпляр репозитория или ошибку
 func NewUserRepository(ctx context.Context, cfg config.Config, logger *slog.Logger) (*Repository, error) {
 	logger.Info("Подключение к БД...", "URL", cfg.DB.URL)
 	config, err := pgxpool.ParseConfig(cfg.DB.URL)
@@ -43,11 +51,13 @@ func NewUserRepository(ctx context.Context, cfg config.Config, logger *slog.Logg
 	}, nil
 }
 
+// Close закрывает соединение с БД
 func (s *Repository) Close() {
 	s.DB.Close()
 	s.Logger.Info("Подключение к БД закрыто")
 }
 
+// Ping проверяет соединение с БД
 func (s *Repository) Ping(ctx context.Context) error {
 	s.Logger.Debug("Проверка соединения с БД...")
 	return s.DB.Ping(ctx)
