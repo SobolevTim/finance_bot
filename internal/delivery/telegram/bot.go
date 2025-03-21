@@ -13,10 +13,9 @@ import (
 
 // Bot структура бота
 type Bot struct {
-	Client       *telego.Bot           // Клиент телеграма
-	UserService  *service.UserService  // Сервис для работы с пользователями
-	StatusMemory *service.StatusMemory // Сервис для работы со статусами
-	logger       *slog.Logger          // Логгер
+	Client  *telego.Bot      // Клиент телеграма
+	Service *service.Service // Сервис
+	logger  *slog.Logger     // Логгер
 }
 
 // NewBot создает новый экземпляр бота
@@ -28,7 +27,7 @@ type Bot struct {
 // debug - режим отладки
 //
 // Возвращает новый экземпляр бота или ошибку
-func NewBot(token string, userService *service.UserService, statusMem *service.StatusMemory, logger *slog.Logger, debug bool) (*Bot, error) {
+func NewBot(token string, service *service.Service, logger *slog.Logger, debug bool) (*Bot, error) {
 	logger.Debug("Создание бота с токеном", "token", token)
 	logger.Debug("Дебаг режим бота", "debug", debug)
 
@@ -44,10 +43,9 @@ func NewBot(token string, userService *service.UserService, statusMem *service.S
 	}
 	logger.Info("Авторизация бота", "bot", bot.Username, "id", bot.ID, "firstName", bot.FirstName, "lastName", bot.LastName)
 	return &Bot{
-		Client:       client,
-		UserService:  userService,
-		StatusMemory: statusMem,
-		logger:       logger,
+		Client:  client,
+		Service: service,
+		logger:  logger,
 	}, nil
 }
 

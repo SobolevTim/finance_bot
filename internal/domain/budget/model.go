@@ -4,44 +4,74 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 var (
-	ErrEmptyTelegramID = errors.New("empty telegram id") // Ошибка пустого Telegram ID
-	ErrEmptyCurrency   = errors.New("empty currency")    // Ошибка пустой валюты
+	ErrNegativeBudget        = errors.New("budget amount cannot be negative")
+	ErrInvalidBudgetPeriod   = errors.New("end date must be after start date")
+	ErrCategoryNotFound      = errors.New("category not found in budget")
+	ErrCategoryLimitExceeded = errors.New("category limit exceeded")
 )
 
-// Budget - структура для хранения информации о бюджете пользователя
+// Budget представляет собой месячный бюджет пользователя
 type Budget struct {
-	ID         uuid.UUID // Идентификатор
-	TelegramID string    // Telegram ID пользователя
-	Amount     int64     // Сумма * 100
-	Currency   string    // Валюта
-	Date       time.Time // Дата
-	UpdateDate time.Time // Дата обновления
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Amount     decimal.Decimal
+	Currency   string
+	StartDate  time.Time
+	EndDate    time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Categories map[uuid.UUID]decimal.Decimal // Лимиты по категориям
 }
 
-func NewBudget(telegramID string, amount int64, currency string) (*Budget, error) {
-	if telegramID == "" {
-		return nil, ErrEmptyTelegramID
+// New создает новый бюджет с валидацией
+func New(userID uuid.UUID, amount decimal.Decimal, currency string, startDate, endDate time.Time) (*Budget, error) {
+	if amount.IsNegative() {
+		return nil, ErrNegativeBudget
 	}
-	if currency == "" {
-		return nil, ErrEmptyCurrency
+
+	if endDate.Before(startDate) || endDate.Equal(startDate) {
+		return nil, ErrInvalidBudgetPeriod
 	}
-	uuid, err := uuid.NewV4()
-	if err != nil {
-		return nil, err
-	}
+
 	return &Budget{
-		ID:         uuid,
-		TelegramID: telegramID,
+		ID:         uuid.New(),
+		UserID:     userID,
 		Amount:     amount,
 		Currency:   currency,
-		Date:       time.Now().UTC(),
+		StartDate:  startDate,
+		EndDate:    endDate,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+		Categories: make(map[uuid.UUID]decimal.Decimal),
 	}, nil
 }
 
-func NewDefaultBudget(telegramID string) (*Budget, error) {
-	return NewBudget(telegramID, 0, "RUB")
+// IsActive проверяет, активен ли бюджет на текущий момент
+func (b *Budget) IsActive(now time.Time) bool {
+	return !now.Before(b.StartDate) && !now.After(b.EndDate)
+}
+
+// AddCategory добавляет лимит для категории
+func (b *Budget) AddCategory(categoryID uuid.UUID, limit decimal.Decimal) error {
+	if limit.IsNegative() {
+		return ErrNegativeBudget
+	}
+	b.Categories[categoryID] = limit
+	return nil
+}
+
+// UpdateBalance обновляет остаток бюджета после добавления расхода
+func (b *Budget) UpdateBalance(amount decimal.Decimal, categoryID uuid.UUID) error {
+	if limit, exists := b.Categories[categoryID]; exists {
+		if amount.GreaterThan(limit) {
+			return ErrCategoryLimitExceeded
+		}
+	}
+	b.Amount = b.Amount.Sub(amount)
+	return nil
 }

@@ -3,7 +3,6 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/mymmrac/telego"
@@ -27,6 +26,8 @@ func (b *Bot) handlersCmd(update telego.Update) {
 		// TODO: Добавить обработку команды help
 	case "/setbudget":
 		b.handlersSetBudget(update)
+	case "/getbudget":
+		b.handlersGetBudget(update)
 	default:
 		b.logger.Debug("Неизвестная команда", "command", update.Message.Text)
 		b.SendMessage(update.Message.Chat.ID, "Неизвестная команда")
@@ -43,31 +44,34 @@ func (b *Bot) handlersStart(update telego.Update) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Регистрация пользователя в базе данных
-	tgID := strconv.FormatInt(update.Message.Chat.ID, 10)
-	user, budget, err := b.UserService.RegisterUser(ctx, tgID, update.Message.From.Username, update.Message.From.FirstName, update.Message.From.LastName)
+	user, err := b.Service.RegisterUser(ctx, update.Message.Chat.ID, update.Message.From.Username, update.Message.Chat.FirstName, update.Message.Chat.LastName)
 
 	if err != nil {
 		b.logger.Error("Ошибка регистрации пользователя", "error", err)
-		b.SendErrorMessage(update.Message.Chat.ID, "Ошибка регистрации пользователя")
+		b.SendErrorMessage(update.Message.Chat.ID, "Ошибка регистрации пользователя, попробуйте еще раз")
 		return
 	}
 
-	if budget.Amount == 0 {
-		b.logger.Debug("Бюджет не установлен", "tgID", update.Message.Chat.ID)
-		text := "Для начала работы укажите ваш бюджет на месяц"
-		b.SendMessage(update.Message.Chat.ID, text)
+	// Получение бюджета пользователя
+	budget, err := b.Service.GetCurrentBudget(ctx, user.ID)
+	if err != nil {
+		b.logger.Error("Ошибка получения бюджета", "error", err)
+		b.SendErrorMessage(update.Message.Chat.ID, "Ошибка получения бюджета, попробуйте еще раз")
+		return
+	}
 
-		err := b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
+	if budget == nil {
+		b.logger.Debug("Бюджет не найден", "userID", user.ID)
+		b.SendMessage(update.Message.Chat.ID, "💰Бюджет на месяц еще не установлен!\nНапишите мне сумму, которые вы закладываете на месяц")
+		err := b.Service.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
 		if err != nil {
-			b.logger.Error("Ошибка обновления статуса", "error", err)
-			b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
+			b.logger.Error("Ошибка установки статуса", "error", err)
+			b.SendErrorMessage(update.Message.Chat.ID, "Что-то пошло не так. Попробуйте еще раз чуть позже")
 		}
 		return
 	}
-
 	// Формирование сообщения
-	text := fmt.Sprintf("Привет, %s!\nЯ бот для ведения бюджета.\nВаш бюджет на месяц %d", user.UserName, budget.Amount/100)
+	text := fmt.Sprintf("Привет, %s!\nЯ бот для ведения бюджета.\nВаш бюджет на месяц %.2f", user.UserName, budget.Amount.InexactFloat64())
 
 	// Отправка сообщения
 	b.SendMessage(update.Message.Chat.ID, text)
@@ -83,7 +87,7 @@ func (b *Bot) handlersCancel(update telego.Update) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	err := b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, "")
+	err := b.Service.SetStatus(ctx, update.Message.Chat.ID, "")
 	if err != nil {
 		b.logger.Error("Ошибка обновления статуса", "error", err)
 		b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
@@ -104,7 +108,7 @@ func (b *Bot) handlersSetBudget(update telego.Update) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	err := b.StatusMemory.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
+	err := b.Service.SetStatus(ctx, update.Message.Chat.ID, StatusBudget)
 	if err != nil {
 		b.logger.Error("Ошибка обновления статуса", "error", err)
 		b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
@@ -112,5 +116,38 @@ func (b *Bot) handlersSetBudget(update telego.Update) {
 	}
 
 	text := "Укажите ваш бюджет на месяц"
+	b.SendMessage(update.Message.Chat.ID, text)
+}
+
+// handlersGetBudget обработка команды получения бюджета
+//
+// При получении команды отправляет сообщение с текущим бюджетом пользователя
+// Если бюджет не установлен, отправляет сообщение об этом
+func (b *Bot) handlersGetBudget(update telego.Update) {
+	b.logger.Debug("Обработка команды getbudget", "tgID", update.Message.Chat.ID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	user, err := b.Service.GetUserByTelegramID(ctx, update.Message.Chat.ID)
+	if err != nil {
+		b.logger.Error("Ошибка получения пользователя", "error", err)
+		b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	budget, err := b.Service.GetCurrentBudget(ctx, user.ID)
+	if err != nil {
+		b.logger.Error("Ошибка получения бюджета", "error", err)
+		b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	if budget == nil {
+		b.SendMessage(update.Message.Chat.ID, "Бюджет на месяц еще не установлен")
+		return
+	}
+
+	text := fmt.Sprintf("Ваш бюджет на месяц %.2f", budget.Amount.InexactFloat64())
 	b.SendMessage(update.Message.Chat.ID, text)
 }

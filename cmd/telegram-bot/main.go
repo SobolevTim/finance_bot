@@ -26,7 +26,7 @@ func main() {
 	bdlogger := logger.GetLogger("database")
 	memlogger := logger.GetLogger("memorydb")
 
-	// Подключаем репозитории
+	// Подключаем репозиторий
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	repo, err := database.NewUserRepository(ctx, *config, bdlogger)
@@ -36,22 +36,22 @@ func main() {
 	}
 	defer repo.Close()
 
+	// Подключаем репозиторий Статистики
 	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	repoMem, err := memory.NewMemoryRepository(ctx, *config, memlogger)
+	StatRepo, err := memory.NewMemoryRepository(ctx, *config, memlogger)
 	if err != nil {
 		memlogger.Error("ошибка при создании memory repository", "error", err)
 		return
 	}
-	defer repo.Close()
-	defer repoMem.Close()
+	defer StatRepo.Close()
+	defer StatRepo.Close()
 
 	// Подключаем сервисы
-	userService := service.NewUserService(repo, repo)
-	statusMemory := service.NewStatusMemory(repoMem)
+	service := service.NewService(repo, repo, StatRepo)
 
 	// Создаем бота
-	bot, err := telegram.NewBot(config.TG.Token, userService, statusMemory, tglogger, config.TG.Debug)
+	bot, err := telegram.NewBot(config.TG.Token, service, tglogger, config.TG.Debug)
 	if err != nil {
 		tglogger.Error("ошибка создания бота", "error", err)
 		return
