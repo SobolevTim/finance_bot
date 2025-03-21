@@ -6,20 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  GO_VERSION: "1.23"
-  DB_NAME: expenses_test
-  DB_USER: test_user
-  DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
-  REDIS_PORT: 6379
-
-  # REDIS_ADDR and DB_URL will be defined in the steps block
-
 jobs:
   test:
     name: Run Test Suite
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    env:
+      GO_VERSION: "1.23"
+      DB_NAME: expenses_test
+      DB_USER: test_user
+      DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+      REDIS_PORT: 6379
 
     services:
       postgres:
