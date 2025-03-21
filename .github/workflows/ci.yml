@@ -11,9 +11,9 @@ env:
   DB_NAME: expenses_test
   DB_USER: test_user
   DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
-  DB_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}?sslmode=disable
   REDIS_PORT: 6379
-  REDIS_ADDR: localhost:${{ env.REDIS_PORT }}
+
+  # REDIS_ADDR and DB_URL will be defined in the steps block
 
 jobs:
   test:
@@ -31,7 +31,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ${{ env.DB_USER }} -d ${{ env.DB_NAME }}"
+          --health-cmd "pg_isready -U test_user -d expenses_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -39,7 +39,7 @@ jobs:
       redis:
         image: redis:7-alpine
         ports:
-          - ${{ env.REDIS_PORT }}:${{ env.REDIS_PORT }}
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -58,5 +58,5 @@ jobs:
       - name: Run tests
         run: go test -v ./...
         env:
-          DB_URL: ${{ env.DB_URL }}
-          REDIS_ADDR: ${{ env.REDIS_ADDR }}
+          DB_URL: postgres://${{ env.DB_USER }}:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}?sslmode=disable
+          REDIS_ADDR: localhost:${{ env.REDIS_PORT }}
