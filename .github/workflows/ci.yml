@@ -21,11 +21,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15
         env:
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
-          POSTGRES_DB: ${{ env.DB_NAME }}
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+          POSTGRES_DB: expenses_test
         ports:
           - 5432:5432
         options: >-
@@ -39,7 +39,7 @@ jobs:
         ports:
           - 6379:6379
         options: >-
-          --health-cmd "redis-cli ping"
+          --health-cmd "redis-cli -h localhost ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -51,10 +51,26 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: "1.23"
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            go-mod-
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in {1..10}; do
+            pg_isready -h localhost -U test_user -d expenses_test && break
+            echo "Waiting for database..."
+            sleep 3
+          done
 
       - name: Run tests
         run: go test -v ./...
         env:
-          DB_URL: postgres://${{ env.DB_USER }}:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}?sslmode=disable
-          REDIS_ADDR: localhost:${{ env.REDIS_PORT }}
+          DB_URL: postgres://test_user:${{ secrets.TEST_DB_PASSWORD }}@localhost:5432/expenses_test?sslmode=disable
+          REDIS_ADDR: localhost:6379
