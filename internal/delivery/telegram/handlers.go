@@ -65,34 +65,25 @@ func (b *Bot) handlerStatus(status string, update telego.Update) {
 // Отправка сообщения о результате
 func (b *Bot) requestBudget(update telego.Update) {
 	chatID := update.Message.Chat.ID
-	b.logger.Debug("Запрос бюджета", "tgID", chatID)
-
-	// Получем пользователя
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	user, err := b.Service.GetUserByTelegramID(ctx, chatID)
-	if err != nil {
-		b.logger.Error("Ошибка получения пользователя", "error", err)
-		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
-		return
-	}
-
 	amount := update.Message.Text
-	budget, err := b.Service.CreateBudget(ctx, user.ID, amount, "RUB", time.Now(), time.Now().AddDate(0, 1, 0))
+	b.logger.Debug("Запрос бюджета", "tgID", chatID, "amount", amount)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	budget, err := b.Service.UpdateBudgetByTgID(ctx, chatID, amount)
 	if err != nil {
-		b.logger.Error("Ошибка обновлении бюджета", "error", err)
+		b.logger.Error("Ошибка обновления бюджета", "error", err)
 		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
 		return
 	}
-
-	err = b.Service.SetStatus(ctx, chatID, "")
-	if err != nil {
-		b.logger.Error("Ошибка обновления статуса", "error", err)
+	if budget == nil {
+		b.logger.Error("Ошибка обновления бюджета", "error", "budget is nil")
 		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
 		return
 	}
 
 	text := fmt.Sprintf("Бюджет на месяц установлен: %.2f", budget.Amount.InexactFloat64())
+	b.logger.Debug("Бюджет установлен", "tgID", chatID, "amount", budget.Amount.InexactFloat64())
 	b.SendMessage(chatID, text)
 }
 

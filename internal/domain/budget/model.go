@@ -13,6 +13,7 @@ var (
 	ErrInvalidBudgetPeriod   = errors.New("end date must be after start date")
 	ErrCategoryNotFound      = errors.New("category not found in budget")
 	ErrCategoryLimitExceeded = errors.New("category limit exceeded")
+	ErrUserNotFound          = errors.New("user not found")
 )
 
 // Budget представляет собой месячный бюджет пользователя

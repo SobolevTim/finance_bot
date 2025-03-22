@@ -10,6 +10,7 @@ import (
 type Repository interface {
 	BudgetCreate(ctx context.Context, budget *Budget) error
 	BudgetGetByID(ctx context.Context, id uuid.UUID) (*Budget, error)
+	BudgetGetByTgID(ctx context.Context, tgID string) (*Budget, error)
 	BudgetGetCurrent(ctx context.Context, userID uuid.UUID) (*Budget, error)
 	BudgetUpdate(ctx context.Context, budget *Budget) error
 	BudgetDelete(ctx context.Context, id uuid.UUID) error
