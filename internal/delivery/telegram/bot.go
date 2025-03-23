@@ -125,3 +125,50 @@ func (b *Bot) SendMessage(id int64, text string) {
 	}
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
 }
+
+func (b *Bot) SendMessageWithKeyboard(id int64, text string, keyboard telego.ReplyMarkup) {
+	msg := tu.Message(tu.ID(id), text).WithReplyMarkup(keyboard)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err := b.Client.SendMessage(ctx, msg)
+	if err != nil {
+		b.logger.Error("Ошибка отправки сообщения", "error", err)
+		return
+	}
+	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
+}
+
+func (b *Bot) sendAmountPrompt(chatID int64) {
+	b.logger.Debug("Запрос суммы расхода", "chatID", chatID)
+	b.sendTextPrompt(chatID, "Введите сумму расхода (можно использовать математическое выражение, например, 150+20):")
+}
+
+func (b *Bot) sendTextPrompt(chatID int64, prompt string) {
+	msg := tu.Message(tu.ID(chatID), prompt)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err := b.Client.SendMessage(ctx, msg)
+	if err != nil {
+		b.logger.Error("Ошибка отправки сообщения", "error", err)
+		return
+	}
+	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
+}
+
+func (b *Bot) sendConfirmation(chatID int64, entry *service.ExpenseEntryDTO) {
+	b.logger.Debug("Подтверждение записи расхода", "chatID", chatID, "entry", entry)
+	summary := fmt.Sprintf("Подтвердите запись расхода:\nДата: %s\nСумма: %.2f₽\nКатегория: %s\nПримечание: %s",
+		entry.Date.Format("02.01.2006"),
+		entry.Amount,
+		entry.Category,
+		entry.Note,
+	)
+	keyboard := tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Записать").WithCallbackData("add_confirm"),
+			tu.InlineKeyboardButton("Отменить").WithCallbackData("add_cancel"),
+		),
+	)
+
+	b.SendMessageWithKeyboard(chatID, summary, keyboard)
+}

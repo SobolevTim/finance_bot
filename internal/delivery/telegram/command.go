@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/SobolevTim/finance_bot/internal/service"
 	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
 )
 
 // handlersCmd обработка команд
@@ -30,6 +32,8 @@ func (b *Bot) handlersCmd(update telego.Update) {
 		b.handlersGetBudget(update)
 	case "/expense":
 		b.handleExpenseCommand(update.Message.Chat.ID, 0)
+	case "/add":
+		b.StartAddExpense(update.Message.Chat.ID)
 	default:
 		b.logger.Debug("Неизвестная команда", "command", update.Message.Text)
 		b.SendMessage(update.Message.Chat.ID, "Неизвестная команда")
@@ -152,4 +156,24 @@ func (b *Bot) handlersGetBudget(update telego.Update) {
 
 	text := fmt.Sprintf("Ваш бюджет на месяц %.2f", budget.Amount.InexactFloat64())
 	b.SendMessage(update.Message.Chat.ID, text)
+}
+
+// StartAddExpense инициирует процесс записи расхода.
+func (b *Bot) StartAddExpense(chatID int64) {
+	// Создаем новое состояние записи
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	b.Service.SetExpenseStatus(ctx, chatID, &service.ExpenseEntryDTO{
+		Step: "date",
+	})
+
+	message := "Выберите дату для записи расхода:"
+	keyboard := tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Сегодня").WithCallbackData("add_date_today"),
+			tu.InlineKeyboardButton("Указать дату").WithCallbackData("add_date_custom"),
+		),
+	)
+	msg := tu.Message(tu.ID(chatID), message).WithReplyMarkup(keyboard)
+	b.Client.SendMessage(ctx, msg)
 }
