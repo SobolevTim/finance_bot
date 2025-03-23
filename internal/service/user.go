@@ -2,66 +2,76 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"strconv"
 
-	"github.com/SobolevTim/finance_bot/internal/domain/budget"
 	"github.com/SobolevTim/finance_bot/internal/domain/user"
+	"github.com/google/uuid"
 )
 
-type UserService struct {
-	userRepo   user.Repository
-	budgetRepo budget.Repository
-}
+// RegisterUser регистрирует нового пользователя
+func (s *Service) RegisterUser(
+	ctx context.Context,
+	telegramID int64,
+	userName string,
+	firstName string,
+	lastName string,
+) (*user.User, error) {
+	// Преобразование telegramID в строку
+	telegramIDStr := strconv.FormatInt(telegramID, 10)
 
-func NewUserService(userRepo user.Repository, budgetRepo budget.Repository) *UserService {
-	return &UserService{userRepo: userRepo, budgetRepo: budgetRepo}
-}
-
-// RegisterUser обрабатывает логику регистрации
-func (s *UserService) RegisterUser(ctx context.Context, telegramID, userName, firstName, lastName string) (*user.User, *budget.Budget, error) {
-	existingUser, err := s.userRepo.GetByTelegramID(ctx, telegramID)
+	existingUser, err := s.uR.UserGetByTelegramID(ctx, telegramIDStr)
 	if err == nil {
-		budget, err := s.budgetRepo.GetBudgetByTelegramID(ctx, telegramID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("ошибка при получении бюджета: %w", err)
-		}
-		return existingUser, budget, nil
+		return existingUser, nil
 	}
 
-	newUser, err := user.New(telegramID, userName, firstName, lastName)
+	if !errors.Is(err, user.ErrUserNotFound) {
+		return nil, err
+	}
+
+	// Проверка уникальности username
+	if _, err := s.uR.UserGetByUserName(ctx, userName); err == nil {
+		return nil, user.ErrDuplicateUserName
+	}
+
+	newUser, err := user.New(telegramIDStr, userName, firstName, lastName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("ошибка при создании пользователя: %w", err)
+		return nil, err
 	}
 
-	defaultBudget, err := budget.NewDefaultBudget(telegramID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("ошибка при создании default budget: %w", err)
+	if err := s.uR.UserCreate(ctx, newUser); err != nil {
+		return nil, err
 	}
 
-	if err := s.userRepo.Create(ctx, newUser); err != nil {
-		return nil, nil, fmt.Errorf("ошибка при запись в бд пользователя: %w", err)
-	}
-
-	if err := s.budgetRepo.CreateBudget(ctx, defaultBudget); err != nil {
-		return nil, nil, fmt.Errorf("ошибка при запись в бд бюджета: %w", err)
-	}
-
-	return newUser, defaultBudget, nil
+	return newUser, nil
 }
 
-func (s *UserService) UpdateBudget(ctx context.Context, id, amount int64) error {
-	tgID := strconv.FormatInt(id, 10)
-	_, err := s.budgetRepo.GetBudgetByTelegramID(ctx, tgID)
+func (s *Service) GetUserByTelegramID(ctx context.Context, telegramID int64) (*user.User, error) {
+	telegramIDStr := strconv.FormatInt(telegramID, 10)
+	return s.uR.UserGetByTelegramID(ctx, telegramIDStr)
+}
+
+// UpdateUserProfile обновляет профиль пользователя
+func (s *Service) UpdateUserProfile(
+	ctx context.Context,
+	userID uuid.UUID,
+	userName string,
+	firstName string,
+	lastName string,
+	timezone string,
+) error {
+	user, err := s.uR.UserGetByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("ошибка при обновлении бюджета: %w", err)
+		return err
 	}
-	newBudget, err := budget.NewBudget(tgID, amount, "RUB")
-	if err != nil {
-		return fmt.Errorf("ошибка при обновлении бюджета: %w", err)
+
+	if err := user.UpdateNames(userName, firstName, lastName); err != nil {
+		return err
 	}
-	if err := s.budgetRepo.UpdateBudget(ctx, newBudget); err != nil {
-		return fmt.Errorf("ошибка при обновлении бюджета: %w", err)
+
+	if err := user.UpdateTimezone(timezone); err != nil {
+		return err
 	}
-	return nil
+
+	return s.uR.UserUpdate(ctx, user)
 }

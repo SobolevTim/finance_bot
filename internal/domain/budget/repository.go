@@ -1,10 +1,17 @@
 package budget
 
-import "context"
+import (
+	"context"
 
+	"github.com/google/uuid"
+)
+
+// Repository определяет методы для работы с бюджетами
 type Repository interface {
-	CreateBudget(ctx context.Context, budget *Budget) error
-	GetBudgetByTelegramID(ctx context.Context, telegramID string) (*Budget, error)
-	UpdateBudget(ctx context.Context, b *Budget) error
-	// UpdateBudgetCurrency(ctx context.Context, budget *Budget) error
+	BudgetCreate(ctx context.Context, budget *Budget) error
+	BudgetGetByID(ctx context.Context, id uuid.UUID) (*Budget, error)
+	BudgetGetByTgID(ctx context.Context, tgID string) (*Budget, error)
+	BudgetGetCurrent(ctx context.Context, userID uuid.UUID) (*Budget, error)
+	BudgetUpdate(ctx context.Context, budget *Budget) error
+	BudgetDelete(ctx context.Context, id uuid.UUID) error
 }
