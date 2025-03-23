@@ -48,7 +48,7 @@ func main() {
 	defer StatRepo.Close()
 
 	// Подключаем сервисы
-	service := service.NewService(repo, repo, StatRepo)
+	service := service.NewService(repo, repo, StatRepo, repo, repo)
 
 	// Создаем бота
 	bot, err := telegram.NewBot(config.TG.Token, service, tglogger, config.TG.Debug)

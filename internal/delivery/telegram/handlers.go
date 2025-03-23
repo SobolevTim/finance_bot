@@ -89,5 +89,23 @@ func (b *Bot) requestBudget(update telego.Update) {
 
 func (b *Bot) handlersMessage(update telego.Update) {
 	b.logger.Debug("Обработка общих сообщений", "tgID", update.Message.Chat.ID)
-	// TODO обработка записи трат
+	text := update.Message.Text
+
+	transaction := ParseInput(text)
+	if transaction.Error != nil {
+		b.logger.Error("Ошибка обработки сообщения", "error", transaction.Error)
+		b.SendErrorMessage(update.Message.Chat.ID, "Видимо вы ввели что-то не так!\nНапоминаю что формат ввода: ДД.ММ СУММА ОПИСАНИЕ\nЛибо в кратком формате: СУММА ОПИСАНИЕ. Можно и без описания")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Запись транзакции в базу данных
+	err := b.Service.CreateExpensByTelegramID(ctx, update.Message.Chat.ID, transaction.Result, transaction.Date, transaction.Description)
+	if err != nil {
+		b.logger.Error("Ошибка создания транзакции", "error", err)
+		b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
 }

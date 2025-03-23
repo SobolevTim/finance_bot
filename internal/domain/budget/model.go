@@ -65,14 +65,3 @@ func (b *Budget) AddCategory(categoryID uuid.UUID, limit decimal.Decimal) error 
 	b.Categories[categoryID] = limit
 	return nil
 }
-
-// UpdateBalance обновляет остаток бюджета после добавления расхода
-func (b *Budget) UpdateBalance(amount decimal.Decimal, categoryID uuid.UUID) error {
-	if limit, exists := b.Categories[categoryID]; exists {
-		if amount.GreaterThan(limit) {
-			return ErrCategoryLimitExceeded
-		}
-	}
-	b.Amount = b.Amount.Sub(amount)
-	return nil
-}

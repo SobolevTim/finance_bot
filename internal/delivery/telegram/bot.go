@@ -88,6 +88,9 @@ func (b *Bot) StartPooling() {
 		if update.Message != nil {
 			b.handlers(update)
 		}
+		if update.CallbackQuery != nil {
+			b.inlinehandlers(update)
+		}
 	}
 }
 

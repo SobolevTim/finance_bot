@@ -28,6 +28,8 @@ func (b *Bot) handlersCmd(update telego.Update) {
 		b.handlersSetBudget(update)
 	case "/getbudget":
 		b.handlersGetBudget(update)
+	case "/expense":
+		b.handleExpenseCommand(update.Message.Chat.ID, 0)
 	default:
 		b.logger.Debug("Неизвестная команда", "command", update.Message.Text)
 		b.SendMessage(update.Message.Chat.ID, "Неизвестная команда")
