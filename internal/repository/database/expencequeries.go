@@ -103,9 +103,37 @@ func (r *Repository) GetExpensesByUserID(ctx context.Context, userID uuid.UUID) 
 	return expenses, nil
 }
 
-// GetExpensesByDate возвращает сумму расходов в диапазоне дат по ID пользователя
+// GetExpensesByDate возвращает все расходы в диапазоне дат по ID пользователя
 // возвращает ошибку, если не удалось получить расходы
 func (r *Repository) GetExpensesByDate(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) ([]*expense.Expense, error) {
+	r.Logger.Debug("Получение всех расходов из базы данных по дате", "userID", userID, "startDate", startDate, "endDate", endDate)
+	query := `SELECT id, user_id, category_id, amount, date, is_recurring, recurrence_rule, description FROM expenses WHERE user_id = $1 AND date >= $2 AND date <= $3 ORDER BY date ASC`
+
+	now := time.Now()
+	rows, err := r.DB.Query(ctx, query, userID, startDate, endDate)
+	if err != nil {
+		r.Logger.Debug("Не удалось получить расходы", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	expenses := make([]*expense.Expense, 0)
+	for rows.Next() {
+		expense := &expense.Expense{}
+		err := rows.Scan(&expense.ID, &expense.UserID, &expense.CategoryID, &expense.Ammount, &expense.Date, &expense.IsRecurring, &expense.RecurrenceRule, &expense.Description)
+		if err != nil {
+			r.Logger.Debug("Не удалось получить расход", "error", err)
+			return nil, err
+		}
+		expenses = append(expenses, expense)
+	}
+	r.Logger.Debug("Расходы успешно получены", "expenses", expenses, "duration", time.Since(now))
+	return expenses, nil
+}
+
+// GetExpensesByDate возвращает сумму расходов в диапазоне дат по ID пользователя
+// возвращает ошибку, если не удалось получить расходы
+func (r *Repository) GetExpensesByDateForDay(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) ([]*expense.Expense, error) {
 	r.Logger.Debug("Получение всех расходов из базы данных по дате", "userID", userID, "startDate", startDate, "endDate", endDate)
 	query := `SELECT date, SUM(amount) as total_amount FROM expenses WHERE user_id = $1 AND date >= $2 AND date <= $3
 		GROUP BY date

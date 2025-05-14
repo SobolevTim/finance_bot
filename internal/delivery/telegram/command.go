@@ -25,13 +25,15 @@ func (b *Bot) handlersCmd(update telego.Update) {
 	case "/cancel":
 		b.handlersCancel(update)
 	case "/help":
-		// TODO: Добавить обработку команды help
+		b.SendMessage(update.Message.Chat.ID, "Доступные команды:\n/start - регистрация\n/cancel - отмена операции\n/setbudget - установка бюджета\n/getbudget - получение бюджета\n/expense - просмотр расходов\n/add - добавление расхода")
 	case "/setbudget":
 		b.handlersSetBudget(update)
 	case "/getbudget":
 		b.handlersGetBudget(update)
 	case "/expense":
 		b.handleExpenseCommand(update.Message.Chat.ID, 0)
+	case "/month":
+		b.handleMonthCommand(update.Message.Chat.ID)
 	case "/add":
 		b.StartAddExpense(update.Message.Chat.ID)
 	default:
@@ -50,7 +52,17 @@ func (b *Bot) handlersStart(update telego.Update) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	user, err := b.Service.RegisterUser(ctx, update.Message.Chat.ID, update.Message.From.Username, update.Message.Chat.FirstName, update.Message.Chat.LastName)
+	userName := update.Message.From.Username
+	firstName := update.Message.Chat.FirstName
+	lastName := update.Message.Chat.LastName
+
+	if update.Message.Chat.ID < 0 { // для группы ID = -1234567890
+		userName = update.Message.Chat.Title
+		firstName = update.Message.Chat.Title
+		lastName = update.Message.Chat.Title
+	}
+
+	user, err := b.Service.RegisterUser(ctx, update.Message.Chat.ID, userName, firstName, lastName)
 
 	if err != nil {
 		b.logger.Error("Ошибка регистрации пользователя", "error", err)
@@ -176,4 +188,64 @@ func (b *Bot) StartAddExpense(chatID int64) {
 	)
 	msg := tu.Message(tu.ID(chatID), message).WithReplyMarkup(keyboard)
 	b.Client.SendMessage(ctx, msg)
+}
+
+// handleMonthCommand обрабатывает команду /month
+//
+// Отправляет статистику расходов за текущий месяц
+func (b *Bot) handleMonthCommand(chatID int64) {
+	b.logger.Debug("Обработка команды month", "tgID", chatID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Получение статистики расходов за текущий месяц
+	expenses, sumExp, err := b.Service.GetExpensesByMonth(ctx, chatID)
+	if err != nil {
+		b.logger.Error("Ошибка получения расходов за месяц", "error", err)
+		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	user, err := b.Service.GetUserByTelegramID(ctx, chatID)
+	if err != nil {
+		b.logger.Error("Ошибка получения пользователя", "error", err)
+		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	budget, err := b.Service.GetCurrentBudget(ctx, user.ID)
+	if err != nil {
+		b.logger.Error("Ошибка получения бюджета", "error", err)
+		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	if budget == nil {
+		b.SendMessage(chatID, "Бюджет на месяц еще не установлен")
+		return
+	}
+	userBudget := budget.Amount.InexactFloat64()
+
+	// Формирование сообщения
+	text := fmt.Sprintf("🙈 Расходы за месяц:\n")
+	text += fmt.Sprintf("Всего потрачено: %.2f\n", sumExp)
+	text += fmt.Sprintf("Бюджет на месяц: %.2f\n", userBudget)
+	text += fmt.Sprintf("Осталось: %.2f\n", userBudget-sumExp)
+	daysLeft := time.Now().AddDate(0, 0, 1).Day() - time.Now().Day()
+	text += fmt.Sprintf("Среднее на день осталось: %.2f\n", (userBudget-sumExp)/float64(daysLeft))
+	startDate := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 1, -1)
+	text += fmt.Sprintf("Изнаначальное среднее: %.2f\n", userBudget/float64(endDate.Day()))
+
+	// Отправка сообщения
+	b.SendMessage(chatID, text)
+
+	// Отправка сообщения с детализацией расходов
+	var message string
+	for _, exp := range expenses {
+		message += fmt.Sprintf("📅 %s: %.2f₽ - %s %s - %s", exp.Date.Format("02.01.2006"), exp.Amount, exp.CategoryIcon, exp.Category, exp.Description)
+
+	}
+	b.SendMessage(chatID, message)
 }

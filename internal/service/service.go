@@ -20,14 +20,16 @@ type Service struct {
 }
 
 type ExpenseDTO struct {
-	ID          string    // ID траты
-	UserID      string    // ID пользователя
-	CategoryID  string    // ID категории
-	Amount      float64   // Сумма
-	Date        time.Time // Дата
-	IsRecurring bool      // Повторяющаяся
-	Recurrence  string    // Периодичность
-	Description string    // Описание
+	ID           string    // ID траты
+	UserID       string    // ID пользователя
+	CategoryID   string    // ID категории
+	Category     string    // Категория
+	CategoryIcon string    // Иконка категории
+	Amount       float64   // Сумма
+	Date         time.Time // Дата
+	IsRecurring  bool      // Повторяющаяся
+	Recurrence   string    // Периодичность
+	Description  string    // Описание
 }
 
 type ExpenseEntryDTO struct {

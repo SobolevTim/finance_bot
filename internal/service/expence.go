@@ -7,6 +7,7 @@ import (
 
 	"github.com/SobolevTim/finance_bot/internal/domain/expense"
 	"github.com/SobolevTim/finance_bot/internal/domain/user"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
 
@@ -59,7 +60,7 @@ func (s *Service) GetExpenses(ctx context.Context, telegramID int64, startDate, 
 	}
 
 	// Получение трат за период
-	expenses, err := s.eR.GetExpensesByDate(ctx, u.ID, startDate, endDate)
+	expenses, err := s.eR.GetExpensesByDateForDay(ctx, u.ID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -115,4 +116,72 @@ func (s *Service) AddExpense(ctx context.Context, telegramID int64, amount float
 		return err
 	}
 	return nil
+}
+
+func (s *Service) GetExpensesByMonth(ctx context.Context, telegramID int64) ([]*ExpenseDTO, float64, error) {
+	// Преобразование int64 в строку
+	telegramIDStr := strconv.FormatInt(telegramID, 10)
+	// Получение пользователя по telegramID
+	u, err := s.uR.UserGetByTelegramID(ctx, telegramIDStr)
+	if err != nil {
+		return nil, 0, user.ErrUserNotFound
+	}
+
+	if u == nil {
+		return nil, 0, user.ErrUserNotFound
+	}
+
+	// startDate - первый день текущего месяца
+	startDate := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+	// endDate - последний день текущего месяца
+	endDate := startDate.AddDate(0, 1, -1)
+
+	// Получение трат за текущий месяц
+	expenses, err := s.eR.GetExpensesByDate(ctx, u.ID, startDate, endDate)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if len(expenses) == 0 {
+		return nil, 0, expense.ErrorExpenseNotFound
+	}
+
+	// Получение Категорий с иконками
+	var ids []uuid.UUID
+
+	for _, e := range expenses {
+		ids = append(ids, e.CategoryID)
+	}
+
+	categories, err := s.cR.CategoriesGetBuIDs(ctx, ids)
+	sum := 0.0
+
+	// Преобразование трат в DTO
+	expensesDTO := make([]*ExpenseDTO, 0, len(expenses))
+	for _, e := range expenses {
+		var icon string
+		var category string
+		for _, c := range categories {
+			if c.ID == e.CategoryID {
+				icon = c.Icon
+				category = c.Name
+				break
+			}
+		}
+		sum += e.Ammount.InexactFloat64()
+		expensesDTO = append(expensesDTO, &ExpenseDTO{
+			ID:           e.ID.String(),
+			UserID:       e.UserID.String(),
+			CategoryID:   e.CategoryID.String(),
+			CategoryIcon: icon,
+			Category:     category,
+			Amount:       e.Ammount.InexactFloat64(),
+			Date:         e.Date,
+			IsRecurring:  e.IsRecurring,
+			Recurrence:   e.RecurrenceRule,
+			Description:  e.Description,
+		})
+	}
+
+	return expensesDTO, sum, nil
 }

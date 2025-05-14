@@ -28,7 +28,7 @@ func (b *Bot) handlers(update telego.Update) {
 	}
 	chatID := update.Message.Chat.ID
 
-	// Получение статуса бюджета
+	// Получение статуса
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	status, err := b.Service.GetStatus(ctx, chatID)
@@ -95,6 +95,14 @@ func (b *Bot) requestBudget(update telego.Update) {
 	}
 	if budget == nil {
 		b.logger.Error("Ошибка обновления бюджета requestBudget", "error", "budget is nil")
+		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
+		return
+	}
+
+	// Установка статуса
+	err = b.Service.SetStatus(ctx, chatID, "")
+	if err != nil {
+		b.logger.Error("Ошибка установки статуса", "error", err)
 		b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
 		return
 	}
@@ -175,5 +183,5 @@ func (b *Bot) HandleAddExpenseText(chatID int64, text string, entry *service.Exp
 func (b *Bot) handlersMessage(update telego.Update) {
 	b.logger.Debug("Обработка общих сообщений", "tgID", update.Message.Chat.ID)
 	// TODO обработка сообщений
-	b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Воспользуйтесь командами:\n/start для начала работы\n/help для получения справки")
+	// b.SendErrorMessage(update.Message.Chat.ID, "Произошла ошибка. Воспользуйтесь командами:\n/start для начала работы\n/help для получения справки")
 }

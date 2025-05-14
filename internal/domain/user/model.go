@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	telegramIDRegex = regexp.MustCompile(`^[0-9]+$`)
+	telegramIDRegex = regexp.MustCompile(`^-?[0-9]+$`) // ID 1234567890 && -1234567890
 	timezoneRegex   = regexp.MustCompile(`^UTC[+-]\d{1,2}$`)
 )
 

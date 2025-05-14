@@ -16,7 +16,7 @@ const daysPerPage = 7
 // handleInline обрабатывает инлайн-кнопки
 func (b *Bot) inlinehandlers(update telego.Update) {
 	callbackData := update.CallbackQuery.Data
-	chatID := update.CallbackQuery.From.ID
+	chatID := update.CallbackQuery.Message.GetChat().ID
 	b.logger.Debug("Получено инлайн-событие", "callbackData", callbackData, "tgID", chatID)
 
 	if strings.HasPrefix(callbackData, "expenses_page_") {

@@ -45,6 +45,40 @@ func (r *Repository) CategoriesGetByID(ctx context.Context, id uuid.UUID) (*cate
 	return c, nil
 }
 
+// CategoriesGetBuIDs возвращает категории по ID
+func (r *Repository) CategoriesGetBuIDs(ctx context.Context, ids []uuid.UUID) ([]*categories.Categories, error) {
+	r.Logger.Debug("Получение категорий по ID", "ids", ids)
+	query := `
+		SELECT id, user_id, name, is_default, icon, created_at, updated_at
+		FROM categories
+		WHERE id = ANY($1)
+	`
+	now := time.Now()
+	rows, err := r.DB.Query(ctx, query, ids)
+	if err != nil {
+		r.Logger.Debug("Ошибка получения категорий", "error", err)
+		return nil, err
+	}
+	defer rows.Close()
+
+	cat := make([]*categories.Categories, 0)
+	for rows.Next() {
+		c := &categories.Categories{}
+		err = rows.Scan(&c.ID, &c.UserID, &c.Name, &c.IsDefault, &c.Icon, &c.CreatedAt, &c.UpdatedAt)
+		if err != nil {
+			r.Logger.Debug("Ошибка сканирования категории", "error", err)
+			return nil, err
+		}
+		cat = append(cat, c)
+	}
+	if rows.Err() != nil {
+		r.Logger.Debug("Ошибка перебора категорий", "error", rows.Err())
+		return nil, rows.Err()
+	}
+	r.Logger.Debug("Категории получены", "categories", cat, "timeSinnce", time.Since(now))
+	return cat, nil
+}
+
 // CategoriesGetForUser возвращает список категорий для пользователя
 func (r *Repository) CategoriesGetForUser(ctx context.Context, userID uuid.UUID) ([]*categories.Categories, error) {
 	r.Logger.Debug("Получение категорий для пользователя", "userID", userID)

@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrEmptyRecurrenceRule = errors.New("recurrence rule is required for recurring expenses")
+	ErrorExpenseNotFound   = errors.New("expense not found")
 )
 
 type Expense struct {
