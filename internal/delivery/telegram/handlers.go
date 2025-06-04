@@ -120,21 +120,6 @@ func (b *Bot) HandleAddExpenseText(chatID int64, text string, entry *service.Exp
 	defer cancel()
 
 	switch entry.Step {
-	case "date_input":
-		t, err := time.Parse("02.01.2006", text)
-		if err != nil {
-			b.SendErrorMessage(chatID, "Неверный формат даты. Попробуйте еще раз.")
-			return
-		}
-		entry.Date = t
-		entry.Step = "amount"
-		err = b.Service.SetExpenseStatus(ctx, chatID, entry)
-		if err != nil {
-			b.logger.Error("Ошибка установки статуса записи расхода", "error", err)
-			b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
-			return
-		}
-		b.sendAmountPrompt(chatID)
 	case "amount":
 		amount, err := calc.Calculate(text)
 		if err != nil {
@@ -149,8 +134,8 @@ func (b *Bot) HandleAddExpenseText(chatID int64, text string, entry *service.Exp
 			b.SendErrorMessage(chatID, "Произошла ошибка. Попробуйте еще раз")
 			return
 		}
-		// Показываем кнопки для выбора категории.
 
+		// Показываем кнопки для выбора категории.
 		defaultCategory, err := b.Service.GetDefaultCategories(ctx)
 		if err != nil {
 			b.logger.Error("Ошибка получения категорий", "error", err)
@@ -165,6 +150,10 @@ func (b *Bot) HandleAddExpenseText(chatID int64, text string, entry *service.Exp
 				tu.InlineKeyboardButton(cat.Icon+" "+cat.Name).WithCallbackData("add_category_"+cat.Name),
 			))
 		}
+		keyboard := tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("⛔️ Отменить ввод расхода").WithCallbackData("add_cancel"),
+		)
+		keyboards.InlineKeyboard = append(keyboards.InlineKeyboard, keyboard)
 
 		b.SendMessageWithKeyboard(chatID, "Выберите категорию расхода:", keyboards)
 	case "note_input":

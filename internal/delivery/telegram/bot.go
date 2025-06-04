@@ -138,21 +138,30 @@ func (b *Bot) SendMessageWithKeyboard(id int64, text string, keyboard telego.Rep
 	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
 }
 
-func (b *Bot) sendAmountPrompt(chatID int64) {
-	b.logger.Debug("Запрос суммы расхода", "chatID", chatID)
-	b.sendTextPrompt(chatID, "Введите сумму расхода (можно использовать математическое выражение, например, 150+20):")
-}
-
-func (b *Bot) sendTextPrompt(chatID int64, prompt string) {
-	msg := tu.Message(tu.ID(chatID), prompt)
+func (b *Bot) EditMessageWithKeyboard(id int64, messageID int, text string, keyboard *telego.InlineKeyboardMarkup) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := b.Client.SendMessage(ctx, msg)
+	params := &telego.EditMessageTextParams{
+		ChatID:      tu.ID(id),
+		MessageID:   messageID,
+		Text:        text,
+		ReplyMarkup: keyboard,
+	}
+
+	_, err := b.Client.EditMessageText(ctx, params)
 	if err != nil {
-		b.logger.Error("Ошибка отправки сообщения", "error", err)
+		b.logger.Error("Ошибка редактирования сообщения",
+			"error", err,
+			"chatID", id,
+			"messageID", messageID,
+			"text", text)
 		return
 	}
-	b.logger.Debug("Отправка сообщения", "message", msg.Text, "chatID", msg.ChatID)
+
+	b.logger.Debug("Сообщение успешно отредактировано",
+		"chatID", id,
+		"messageID", messageID,
+		"message", text)
 }
 
 func (b *Bot) sendConfirmation(chatID int64, entry *service.ExpenseEntryDTO) {
@@ -171,4 +180,22 @@ func (b *Bot) sendConfirmation(chatID int64, entry *service.ExpenseEntryDTO) {
 	)
 
 	b.SendMessageWithKeyboard(chatID, summary, keyboard)
+}
+
+func (b *Bot) editConfirmation(chatID int64, id int, entry *service.ExpenseEntryDTO) {
+	b.logger.Debug("Подтверждение записи расхода c редактированием сообщения", "chatID", chatID, "id", id, "entry", entry)
+	summary := fmt.Sprintf("Подтвердите запись расхода:\nДата: %s\nСумма: %.2f₽\nКатегория: %s\nПримечание: %s",
+		entry.Date.Format("02.01.2006"),
+		entry.Amount,
+		entry.Category,
+		entry.Note,
+	)
+	keyboard := tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Записать").WithCallbackData("add_confirm"),
+			tu.InlineKeyboardButton("Отменить").WithCallbackData("add_cancel"),
+		),
+	)
+
+	b.EditMessageWithKeyboard(chatID, id, summary, keyboard)
 }
