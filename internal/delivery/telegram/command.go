@@ -192,9 +192,9 @@ func (b *Bot) StartAddExpense(chatID int64) {
 
 	// Add month/year and navigation row
 	monthRow := []telego.InlineKeyboardButton{
-		tu.InlineKeyboardButton("←").WithCallbackData(fmt.Sprintf("add_month_%d_%d", int(month)-1, year)),
+		tu.InlineKeyboardButton("←").WithCallbackData(fmt.Sprintf("add_month_%d_%d", firstDay.AddDate(0, -1, 0).Month(), firstDay.AddDate(0, -1, 0).Year())),
 		tu.InlineKeyboardButton(fmt.Sprintf("%s %d", month.String(), year)).WithCallbackData("ignore"),
-		tu.InlineKeyboardButton("→").WithCallbackData(fmt.Sprintf("add_month_%d_%d", int(month)+1, year)),
+		tu.InlineKeyboardButton("→").WithCallbackData(fmt.Sprintf("add_month_%d_%d", firstDay.AddDate(0, 1, 0).Month(), firstDay.AddDate(0, 1, 0).Year())),
 	}
 	rows = append(rows, monthRow)
 
