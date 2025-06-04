@@ -35,6 +35,11 @@ func (b *Bot) inlinehandlers(update telego.Update) {
 		}
 	case strings.HasPrefix(data, "add_"):
 		b.HandleAddExpenseCallback(msg.GetMessageID(), chatID, data)
+		_ = b.Client.AnswerCallbackQuery(context.Background(), &telego.AnswerCallbackQueryParams{
+			CallbackQueryID: update.CallbackQuery.ID,
+			Text:            "Расход добавлен!",
+			ShowAlert:       false,
+		})
 	default:
 		_ = b.Client.AnswerCallbackQuery(context.Background(), &telego.AnswerCallbackQueryParams{
 			CallbackQueryID: update.CallbackQuery.ID,
