@@ -31,7 +31,7 @@ func (b *Bot) handlersCmd(update telego.Update) {
 	case "/getbudget":
 		b.handlersGetBudget(update)
 	case "/expense":
-		b.handleExpenseCommand(update.Message.Chat.ID, 0)
+		b.handleExpenseCommand(update, 0)
 	case "/month":
 		b.handleMonthCommand(update.Message.Chat.ID)
 	case "/add":
@@ -172,6 +172,7 @@ func (b *Bot) handlersGetBudget(update telego.Update) {
 
 // StartAddExpense инициирует процесс записи расхода.
 func (b *Bot) StartAddExpense(chatID int64) {
+	b.logger.Debug("Обработка команды StartAddExpense", "chatID", chatID)
 	// Создаем новое состояние записи
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -179,14 +180,60 @@ func (b *Bot) StartAddExpense(chatID int64) {
 		Step: "date",
 	})
 
-	message := "Выберите дату для записи расхода:"
-	keyboard := tu.InlineKeyboard(
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Сегодня").WithCallbackData("add_date_today"),
-			tu.InlineKeyboardButton("Указать дату").WithCallbackData("add_date_custom"),
-		),
-	)
-	msg := tu.Message(tu.ID(chatID), message).WithReplyMarkup(keyboard)
+	now := time.Now()
+	year, month, _ := now.Date()
+
+	// Get first day of month and total days
+	firstDay := time.Date(year, month, 1, 0, 0, 0, 0, time.Local)
+	lastDay := firstDay.AddDate(0, 1, -1)
+
+	// Create keyboard rows
+	var rows [][]telego.InlineKeyboardButton
+
+	// Add month/year and navigation row
+	monthRow := []telego.InlineKeyboardButton{
+		tu.InlineKeyboardButton("←").WithCallbackData(fmt.Sprintf("add_month_%d_%d", firstDay.AddDate(0, -1, 0).Month(), firstDay.AddDate(0, -1, 0).Year())),
+		tu.InlineKeyboardButton(fmt.Sprintf("%s %d", month.String(), year)).WithCallbackData("ignore"),
+		tu.InlineKeyboardButton("→").WithCallbackData(fmt.Sprintf("add_month_%d_%d", firstDay.AddDate(0, 1, 0).Month(), firstDay.AddDate(0, 1, 0).Year())),
+	}
+	rows = append(rows, monthRow)
+
+	// Add weekday headers (Mon-Sun)
+	weekDays := []string{"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"}
+	weekDayRow := make([]telego.InlineKeyboardButton, 7)
+	for i, day := range weekDays {
+		weekDayRow[i] = tu.InlineKeyboardButton(day).WithCallbackData("ignore")
+	}
+	rows = append(rows, weekDayRow)
+
+	// Calculate first weekday (0 = Monday)
+	firstWeekDay := int(firstDay.Weekday())
+	if firstWeekDay == 0 {
+		firstWeekDay = 7
+	}
+	firstWeekDay--
+
+	// Generate calendar grid
+	currentDay := 1
+	for week := 0; currentDay <= lastDay.Day(); week++ {
+		var row []telego.InlineKeyboardButton
+		for weekDay := 0; weekDay < 7; weekDay++ {
+			if (week == 0 && weekDay < firstWeekDay) || currentDay > lastDay.Day() {
+				row = append(row, tu.InlineKeyboardButton(" ").WithCallbackData("ignore"))
+			} else {
+				dayStr := fmt.Sprintf("%d", currentDay)
+				if currentDay == now.Day() {
+					dayStr = "✓" + dayStr
+				}
+				row = append(row, tu.InlineKeyboardButton(dayStr).WithCallbackData(fmt.Sprintf("add_date_%d_%d_%d", year, month, currentDay)))
+				currentDay++
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	keyboard := tu.InlineKeyboard(rows...)
+	msg := tu.Message(tu.ID(chatID), "Выберите дату:").WithReplyMarkup(keyboard)
 	b.Client.SendMessage(ctx, msg)
 }
 
@@ -244,8 +291,11 @@ func (b *Bot) handleMonthCommand(chatID int64) {
 	// Отправка сообщения с детализацией расходов
 	var message string
 	for _, exp := range expenses {
-		message += fmt.Sprintf("📅 %s: %.2f₽ - %s %s - %s", exp.Date.Format("02.01.2006"), exp.Amount, exp.CategoryIcon, exp.Category, exp.Description)
-
+		line := fmt.Sprintf("📅 %s: %.2f₽ - %s %s", exp.Date.Format("02.01.2006"), exp.Amount, exp.CategoryIcon, exp.Category)
+		if exp.Description != "" {
+			line += fmt.Sprintf(" - %s", exp.Description)
+		}
+		message += line + "\n"
 	}
 	b.SendMessage(chatID, message)
 }

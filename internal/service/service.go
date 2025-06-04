@@ -33,6 +33,7 @@ type ExpenseDTO struct {
 }
 
 type ExpenseEntryDTO struct {
+	ID       int // ID
 	Date     time.Time
 	Amount   float64
 	Category string
