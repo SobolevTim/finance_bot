@@ -13,7 +13,7 @@ require (
 require (
 	github.com/google/uuid v1.4.0
 	github.com/mymmrac/telego v1.0.0
-	github.com/redis/go-redis/v9 v9.7.1
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.10.0
 )
